@@ -29,6 +29,7 @@ ARK_BASE_URL="${ARK_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}"
 ARK_MODEL_DEFAULT="${ARK_MODEL_DEFAULT:-doubao-seed-2-0-pro-260215}"
 ARK_API_KEY="${ARK_API_KEY:-}"
 OS_NAME="$(uname -s)"
+CODEX_AVAILABLE=false
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -200,6 +201,10 @@ install_launcher() {
   cat >"$launcher_path" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
+if ! command -v codex >/dev/null 2>&1; then
+  echo "codex CLI is not installed. Install codex first, then rerun: codex-arkproxy --model $ARK_MODEL_DEFAULT" >&2
+  exit 1
+fi
 export CODEX_HOME="$CODEX_HOME_DIR"
 exec codex "\$@"
 EOF
@@ -435,6 +440,15 @@ proxy checks:
   curl http://$PROXY_HOST:$PROXY_PORT/v1/models
 EOF
 
+  if [[ "$CODEX_AVAILABLE" != "true" ]]; then
+    cat <<EOF
+
+codex CLI was not found during install.
+install codex first, then run:
+  codex-arkproxy --model $ARK_MODEL_DEFAULT
+EOF
+  fi
+
   case "$SERVICE_MANAGER" in
     launchd)
       printf 'launch agent:\n  %s\n' "$LAUNCH_AGENT_PATH"
@@ -454,8 +468,11 @@ EOF
 main() {
   require_cmd node
   require_cmd npm
-  require_cmd codex
   require_cmd git
+
+  if has_cmd codex; then
+    CODEX_AVAILABLE=true
+  fi
 
   print_step "preparing project files"
   ensure_repo
