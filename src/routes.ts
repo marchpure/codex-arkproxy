@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { OutgoingHttpHeaders } from "node:http";
 import { z } from "zod";
 import type { ProxyConfig, ResponsesRequest } from "./types.js";
 import { ArkRequestAbortedError, ArkUpstreamFetchError, forwardResponsesRequest } from "./ark-client.js";
@@ -512,11 +513,16 @@ function streamNormalizedResponse(reply: FastifyReply, frames: StreamingEventFra
     };
   })();
   const clearIdleTimer = resetIdleTimer();
-  reply.raw.writeHead(200, {
+  const headers: OutgoingHttpHeaders = {};
+  for (const [key, value] of Object.entries(reply.getHeaders())) {
+    headers[key] = typeof value === "number" ? String(value) : value;
+  }
+  Object.assign(headers, {
     "content-type": "text/event-stream; charset=utf-8",
     "cache-control": "no-cache, no-transform",
     connection: "keep-alive"
   });
+  reply.raw.writeHead(200, headers);
   try {
     for (const frame of frames) {
       resetIdleTimer();
@@ -599,6 +605,7 @@ async function handleResponses(request: FastifyRequest, reply: FastifyReply, con
     reply.header("x-codex-ark-upstream-model", downstreamModel);
 
     reply.header("content-type", upstreamResponse.contentType);
+    reply.code(upstreamResponse.status);
 
     if (!stream) {
       return reply.send(upstreamResponse.text);

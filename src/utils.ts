@@ -26,8 +26,10 @@ export function requireProxyAuth(
   }
 
   const header = request.headers.authorization ?? request.headers["x-api-key"];
-  const token = typeof header === "string" && header.toLowerCase().startsWith("bearer ")
-    ? header.slice(7)
+  const token = typeof request.headers.authorization === "string"
+    ? request.headers.authorization.toLowerCase().startsWith("bearer ")
+      ? request.headers.authorization.slice(7)
+      : undefined
     : header;
 
   if (token !== config.proxyAuthToken) {
