@@ -22,6 +22,8 @@ RUNNER_PATH="${RUNNER_PATH:-$INSTALL_ROOT/run-proxy.sh}"
 PID_FILE="${PID_FILE:-$INSTALL_ROOT/$SERVICE_NAME.pid}"
 LOG_DIR="${LOG_DIR:-$INSTALL_ROOT/logs}"
 SERVICE_MANAGER="${SERVICE_MANAGER:-}"
+INSTALL_CODEX_CLI="${INSTALL_CODEX_CLI:-true}"
+CODEX_NPM_PACKAGE="${CODEX_NPM_PACKAGE:-@openai/codex}"
 PROXY_HOST="${PROXY_HOST:-127.0.0.1}"
 PROXY_PORT="${PROXY_PORT:-8787}"
 LOG_LEVEL="${LOG_LEVEL:-info}"
@@ -47,6 +49,24 @@ require_file() {
 
 has_cmd() {
   command -v "$1" >/dev/null 2>&1
+}
+
+ensure_codex_cli() {
+  if has_cmd codex; then
+    CODEX_AVAILABLE=true
+    return
+  fi
+
+  if [[ "$INSTALL_CODEX_CLI" != "true" ]]; then
+    return
+  fi
+
+  print_step "installing codex CLI"
+  npm install -g "$CODEX_NPM_PACKAGE"
+
+  if has_cmd codex; then
+    CODEX_AVAILABLE=true
+  fi
 }
 
 download_and_extract_fallback_archive() {
@@ -469,10 +489,7 @@ main() {
   require_cmd node
   require_cmd npm
   require_cmd git
-
-  if has_cmd codex; then
-    CODEX_AVAILABLE=true
-  fi
+  ensure_codex_cli
 
   print_step "preparing project files"
   ensure_repo

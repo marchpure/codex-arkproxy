@@ -61,7 +61,11 @@ codex-arkproxy exec -C /Users/bytedance/Code/arkclaw-hermes --model doubao-seed-
 - Node.js 20+
 - 可用的 Ark API Key
 
-`codex` 没装也可以先执行安装脚本，代理会先装好；等你后面把 `codex` 装上之后，直接运行 `codex-arkproxy` 即可。
+脚本默认会自动安装 `codex` CLI；如果你不想自动安装，可以在执行时加：
+
+```bash
+INSTALL_CODEX_CLI=false
+```
 
 ## 开发
 
