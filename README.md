@@ -43,7 +43,15 @@ curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark
 - 写入 Codex 所需的代理配置
 - 修复 Doubao 模型缓存
 - 生成 `codex-arkproxy` 启动命令
-- 注册并启动本地 `launchd` 常驻代理
+- 注册并启动本地后台代理
+
+后台服务策略：
+
+- macOS: `launchd`
+- Linux:
+  - 优先 `systemd --user`
+  - root 场景优先系统级 `systemd`
+  - 再不行退化到 `nohup`
 
 前提只有三个：
 
@@ -61,16 +69,16 @@ curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark
 curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark.sh | ARK_API_KEY=你的方舟Key bash
 ```
 
-刷新当前 shell：
-
-```bash
-source ~/.zshrc
-```
-
 直接使用：
 
 ```bash
 codex-arkproxy --model doubao-seed-2-0-pro-260215
+```
+
+如果当前 shell 里还找不到 `codex-arkproxy`，再执行一次新的登录 shell：
+
+```bash
+exec "$SHELL" -l
 ```
 
 如果你只想验证代理是否在线：
