@@ -35,12 +35,15 @@ curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark
 
 这个脚本会自动完成：
 
+- 拉取或更新仓库到本地安装目录
 - 安装依赖
 - 构建代理
 - 初始化当前目录 `.env`
 - 初始化独立的 `~/.codex-arkproxy`
 - 写入 Codex 所需的代理配置
 - 修复 Doubao 模型缓存
+- 生成 `codex-arkproxy` 启动命令
+- 注册并启动本地 `launchd` 常驻代理
 
 前提只有三个：
 
@@ -48,33 +51,32 @@ curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark
 - 已安装 `codex`
 - 有可用的 Ark API Key
 
-安装完成后，直接按照脚本最后打印的命令启动即可。
+安装完成后，不需要再手动 `npm start`，代理会作为本地常驻服务启动。
 
 ## 最短使用路径
 
-1. 启动代理
+安装：
 
 ```bash
-cd /Users/bytedance/Code/arkclaw-hermes/codex-ark-proxy
-npm start
+curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark.sh | ARK_API_KEY=你的方舟Key bash
 ```
 
-2. 启动 Codex
+刷新当前 shell：
 
 ```bash
-CODEX_HOME=$HOME/.codex-arkproxy codex --model doubao-seed-2-0-pro-260215
+source ~/.zshrc
 ```
 
-如果你想固定成一个命令：
-
-```bash
-alias codex-arkproxy='CODEX_HOME=$HOME/.codex-arkproxy codex'
-```
-
-之后直接运行：
+直接使用：
 
 ```bash
 codex-arkproxy --model doubao-seed-2-0-pro-260215
+```
+
+如果你只想验证代理是否在线：
+
+```bash
+curl http://127.0.0.1:8787/healthz
 ```
 
 ## 验证方式
@@ -82,13 +84,13 @@ codex-arkproxy --model doubao-seed-2-0-pro-260215
 非搜索 smoke：
 
 ```bash
-CODEX_HOME=$HOME/.codex-arkproxy codex exec -C /Users/bytedance/Code/arkclaw-hermes --model doubao-seed-2-0-pro-260215 "Reply with exactly: smoke-ok"
+codex-arkproxy exec -C /Users/bytedance/Code/arkclaw-hermes --model doubao-seed-2-0-pro-260215 "Reply with exactly: smoke-ok"
 ```
 
 带搜索的真实回归：
 
 ```bash
-CODEX_HOME=$HOME/.codex-arkproxy codex --search exec -C /Users/bytedance/Code/arkclaw-hermes --model doubao-seed-2-0-pro-260215 "帮我看看今天 github 发布了什么特别火热的项目"
+codex-arkproxy --search exec -C /Users/bytedance/Code/arkclaw-hermes --model doubao-seed-2-0-pro-260215 "帮我看看今天 github 发布了什么特别火热的项目"
 ```
 
 代理自检：
@@ -150,6 +152,19 @@ disable_response_storage = true
 name = "codex"
 base_url = "http://127.0.0.1:8787"
 wire_api = "responses"
+```
+
+5. 手动启动代理
+
+```bash
+cd /Users/bytedance/Code/arkclaw-hermes/codex-ark-proxy
+npm start
+```
+
+6. 手动启动 Codex
+
+```bash
+CODEX_HOME=$HOME/.codex-arkproxy codex --model doubao-seed-2-0-pro-260215
 ```
 
 ## 开发
