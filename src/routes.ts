@@ -94,6 +94,23 @@ export function buildStreamCompletionResponse(
   };
 }
 
+function parseStreamingPayload(payloadText: string): Record<string, unknown> {
+  const payload = JSON.parse(payloadText) as unknown;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new SyntaxError("Ark streaming payload must be a JSON object");
+  }
+
+  const record = payload as Record<string, unknown>;
+  if (
+    "response" in record &&
+    (!record.response || typeof record.response !== "object" || Array.isArray(record.response))
+  ) {
+    throw new SyntaxError("Ark streaming response wrapper must contain a JSON object response");
+  }
+
+  return record;
+}
+
 function emitMessageItemEvents(params: {
   frames: StreamingEventFrame[];
   item: Record<string, unknown>;
@@ -400,7 +417,7 @@ function emitGenericItemEvents(params: {
 }
 
 export function buildStreamingEvents(payloadText: string, downstreamModel: string): StreamingEventFrame[] {
-  const payload = JSON.parse(payloadText) as Record<string, unknown>;
+  const payload = parseStreamingPayload(payloadText);
   const response = normalizeResponseForStreaming(payload, downstreamModel);
   const responseId = typeof response.id === "string" ? response.id : makeRequestId();
   const createdResponse = {

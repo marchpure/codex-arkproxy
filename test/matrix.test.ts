@@ -393,6 +393,9 @@ for (const [name, output] of outputMatrix) {
 const malformedUpstreamCases = [
   ["stream invalid json", true, "not-json", 502, "ark_invalid_streaming_payload"],
   ["stream empty body", true, "", 502, "ark_invalid_streaming_payload"],
+  ["stream null json", true, "null", 502, "ark_invalid_streaming_payload"],
+  ["stream array json", true, "[]", 502, "ark_invalid_streaming_payload"],
+  ["stream wrapped null response", true, "{\"response\":null}", 502, "ark_invalid_streaming_payload"],
   ["non-stream invalid json passes through", false, "not-json", 200, undefined],
   ["non-stream empty body passes through", false, "", 200, undefined]
 ] as const;

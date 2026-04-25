@@ -1,5 +1,6 @@
 import "./ark-client.test.ts";
 import "./config.test.ts";
+import "./complex-scenarios.test.ts";
 import "./matrix.test.ts";
 import "./model-metadata.test.ts";
 import "./reliability.test.ts";
