@@ -30,7 +30,7 @@
 本地执行：
 
 ```bash
-curl -fsSL <你的脚本地址>/bootstrap-codex-ark.sh | ARK_API_KEY=你的方舟Key bash
+curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark.sh | ARK_API_KEY=你的方舟Key bash
 ```
 
 这个脚本会自动完成：
