@@ -1,0 +1,25 @@
+{
+  "name": "codex-ark-proxy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local proxy that maps Codex/OpenAI-style requests to Ark OpenAI-compatible APIs.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --import tsx test/index.test.ts",
+    "repair-model-cache": "node scripts/repair-model-cache.mjs"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.1",
+    "fastify": "^5.6.1",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.3"
+  }
+}

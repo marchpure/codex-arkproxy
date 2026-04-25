@@ -1,0 +1,164 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { buildDownstreamBody, deepStripExternalWebAccess, sanitizeTools } from "../src/ark-client.ts";
+
+const context = {
+  requestId: "req_test",
+  upstreamModel: "doubao-seed-2-0-pro-260215",
+  downstreamModel: "doubao-seed-2-0-pro-260215",
+  stream: true
+};
+
+test("deepStripExternalWebAccess removes Ark-incompatible nested fields", () => {
+  const input = {
+    text: {
+      verbosity: "low"
+    },
+    tools: [
+      {
+        type: "web_search",
+        external_web_access: true
+      }
+    ],
+    nested: {
+      external_web_access: true,
+      child: {
+        verbosity: "low",
+        keep: "ok"
+      }
+    }
+  };
+
+  assert.deepEqual(deepStripExternalWebAccess(input), {
+    text: {},
+    tools: [
+      {
+        type: "web_search"
+      }
+    ],
+    nested: {
+      child: {
+        keep: "ok"
+      }
+    }
+  });
+});
+
+test("sanitizeTools keeps only function tools", () => {
+  const input = [
+    { type: "function", name: "exec_command" },
+    { type: "custom", name: "apply_patch" },
+    { type: "web_search", external_web_access: true },
+    "bad-shape"
+  ];
+
+  assert.deepEqual(sanitizeTools(input), [
+    { type: "function", name: "exec_command" },
+    { type: "web_search" }
+  ]);
+});
+
+test("buildDownstreamBody rewrites stream mode and strips unsupported fields", () => {
+  const input = {
+    model: "doubao-seed-2-0-pro-260215",
+    stream: true,
+    input: [{ type: "message", role: "user", content: "hi" }],
+    text: { verbosity: "low" },
+    tools: [
+      { type: "function", name: "exec_command" },
+      { type: "custom", name: "apply_patch" },
+      { type: "web_search", external_web_access: true }
+    ],
+    client_metadata: { dropped: true },
+    prompt_cache_key: "abc"
+  };
+
+  assert.deepEqual(buildDownstreamBody(input, context), {
+    model: "doubao-seed-2-0-pro-260215",
+    stream: false,
+    input: [{ type: "message", role: "user", content: "hi", status: "completed" }],
+    text: {},
+    tools: [
+      { type: "function", name: "exec_command" },
+      { type: "web_search" }
+    ],
+    prompt_cache_key: "abc"
+  });
+});
+
+test("buildDownstreamBody preserves nested input status for future compatibility", () => {
+  const input = {
+    input: [
+      {
+        type: "function_call_output",
+        call_id: "call_1",
+        status: "completed",
+        output: "ok"
+      }
+    ]
+  };
+
+  assert.deepEqual(buildDownstreamBody(input, context), {
+    model: "doubao-seed-2-0-pro-260215",
+    input: [
+      {
+        type: "function_call_output",
+        call_id: "call_1",
+        status: "completed",
+        output: "ok"
+      }
+    ]
+  });
+});
+
+test("buildDownstreamBody backfills missing input status for replayed output items", () => {
+  const input = {
+    input: [
+      {
+        type: "reasoning",
+        id: "rs_1",
+        summary: [{ type: "summary_text", text: "thinking" }]
+      },
+      {
+        type: "message",
+        role: "assistant",
+        id: "msg_1",
+        content: [{ type: "output_text", text: "hello" }]
+      },
+      {
+        type: "function_call",
+        id: "fc_1",
+        call_id: "call_1",
+        name: "web_search",
+        arguments: "{}"
+      }
+    ]
+  };
+
+  assert.deepEqual(buildDownstreamBody(input, context), {
+    model: "doubao-seed-2-0-pro-260215",
+    input: [
+      {
+        type: "reasoning",
+        id: "rs_1",
+        summary: [{ type: "summary_text", text: "thinking" }],
+        status: "completed"
+      },
+      {
+        type: "message",
+        role: "assistant",
+        id: "msg_1",
+        content: [{ type: "output_text", text: "hello" }],
+        status: "completed"
+      },
+      {
+        type: "function_call",
+        id: "fc_1",
+        call_id: "call_1",
+        name: "web_search",
+        arguments: "{}",
+        status: "completed"
+      }
+    ]
+  });
+});
