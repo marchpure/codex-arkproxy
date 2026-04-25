@@ -493,18 +493,41 @@ export function buildStreamingEvents(payloadText: string, downstreamModel: strin
   return frames;
 }
 
-function streamNormalizedResponse(reply: FastifyReply, payloadText: string, downstreamModel: string): void {
-
+function streamNormalizedResponse(reply: FastifyReply, payloadText: string, downstreamModel: string, idleTimeoutMs: number): void {
+  const resetIdleTimer = (() => {
+    let timer: NodeJS.Timeout | undefined;
+    return () => {
+      if (timer) {
+        clearTimeout(timer);
+      }
+      timer = setTimeout(() => {
+        reply.raw.destroy(new Error("SSE stream idle timeout"));
+      }, idleTimeoutMs);
+      return () => {
+        if (timer) {
+          clearTimeout(timer);
+          timer = undefined;
+        }
+      };
+    };
+  })();
+  const clearIdleTimer = resetIdleTimer();
   reply.raw.writeHead(200, {
     "content-type": "text/event-stream; charset=utf-8",
     "cache-control": "no-cache, no-transform",
     connection: "keep-alive"
   });
-  for (const frame of buildStreamingEvents(payloadText, downstreamModel)) {
-    writeSse(reply, frame.event, frame.data);
+  try {
+    for (const frame of buildStreamingEvents(payloadText, downstreamModel)) {
+      resetIdleTimer();
+      writeSse(reply, frame.event, frame.data);
+    }
+    resetIdleTimer();
+    reply.raw.write("data: [DONE]\n\n");
+    reply.raw.end();
+  } finally {
+    clearIdleTimer();
   }
-  reply.raw.write("data: [DONE]\n\n");
-  reply.raw.end();
 }
 
 async function handleResponses(request: FastifyRequest, reply: FastifyReply, config: ProxyConfig) {
@@ -525,6 +548,17 @@ async function handleResponses(request: FastifyRequest, reply: FastifyReply, con
   const requestId = makeRequestId();
   const { upstreamModel, downstreamModel } = resolveModel(body.model, config);
   const stream = body.stream === true;
+  const clientAbortController = new AbortController();
+  const abortOnClientDisconnect = () => clientAbortController.abort();
+  const abortIfRequestWasAborted = () => {
+    if (request.raw.aborted) {
+      abortOnClientDisconnect();
+    }
+  };
+  request.raw.on("aborted", abortOnClientDisconnect);
+  request.raw.on("close", abortIfRequestWasAborted);
+  reply.raw.socket?.on("close", abortOnClientDisconnect);
+  reply.raw.on("close", abortOnClientDisconnect);
 
   request.log.info({
     requestId,
@@ -537,43 +571,51 @@ async function handleResponses(request: FastifyRequest, reply: FastifyReply, con
     toolChoice: body.tool_choice
   }, "forwarding responses request");
 
-  const upstreamResponse = await forwardResponsesRequest({
-    body,
-    context: {
-      requestId,
-      upstreamModel,
-      downstreamModel,
-      stream
-    },
-    config
-  });
+  try {
+    const upstreamResponse = await forwardResponsesRequest({
+      body,
+      context: {
+        requestId,
+        upstreamModel,
+        downstreamModel,
+        stream,
+        signal: clientAbortController.signal
+      },
+      config
+    });
 
-  if (!upstreamResponse.ok) {
-    const text = await upstreamResponse.text();
-    request.log.error({
-      requestId,
-      status: upstreamResponse.status,
-      body: text
-    }, "ark request failed");
-    reply.code(upstreamResponse.status);
-    reply.header("content-type", upstreamResponse.headers.get("content-type") ?? "application/json");
-    return reply.send(text);
-  }
+    if (!upstreamResponse.ok) {
+      const text = await upstreamResponse.text();
+      request.log.error({
+        requestId,
+        status: upstreamResponse.status,
+        body: text
+      }, "ark request failed");
+      reply.code(upstreamResponse.status);
+      reply.header("content-type", upstreamResponse.headers.get("content-type") ?? "application/json");
+      return reply.send(text);
+    }
 
-  reply.header("x-codex-ark-proxy-request-id", requestId);
-  reply.header("x-codex-ark-upstream-model", downstreamModel);
+    reply.header("x-codex-ark-proxy-request-id", requestId);
+    reply.header("x-codex-ark-upstream-model", downstreamModel);
 
-  const contentType = upstreamResponse.headers.get("content-type") ?? "application/json";
-  reply.header("content-type", contentType);
+    const contentType = upstreamResponse.headers.get("content-type") ?? "application/json";
+    reply.header("content-type", contentType);
 
-  if (!stream) {
+    if (!stream) {
+      const payload = await upstreamResponse.text();
+      return reply.send(payload);
+    }
+
     const payload = await upstreamResponse.text();
-    return reply.send(payload);
+    streamNormalizedResponse(reply, payload, downstreamModel, config.streamIdleTimeoutMs);
+    return reply;
+  } finally {
+    request.raw.off("aborted", abortOnClientDisconnect);
+    request.raw.off("close", abortIfRequestWasAborted);
+    reply.raw.socket?.off("close", abortOnClientDisconnect);
+    reply.raw.off("close", abortOnClientDisconnect);
   }
-
-  const payload = await upstreamResponse.text();
-  streamNormalizedResponse(reply, payload, downstreamModel);
-  return reply;
 }
 
 export async function registerRoutes(app: FastifyInstance, config: ProxyConfig): Promise<void> {

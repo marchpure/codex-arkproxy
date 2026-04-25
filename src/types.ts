@@ -39,4 +39,5 @@ export type ArkRequestContext = {
   downstreamModel: string;
   requestId: string;
   stream: boolean;
+  signal?: AbortSignal;
 };

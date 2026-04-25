@@ -147,7 +147,13 @@ export async function forwardResponsesRequest(params: {
 }): Promise<Response> {
   const { body, context, config } = params;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), config.requestTimeoutMs);
+  const abortUpstream = () => controller.abort();
+  const timeout = setTimeout(abortUpstream, config.requestTimeoutMs);
+  if (context.signal?.aborted) {
+    controller.abort();
+  } else {
+    context.signal?.addEventListener("abort", abortUpstream, { once: true });
+  }
 
   try {
     const downstreamBody = buildDownstreamBody(body, context);
@@ -164,5 +170,6 @@ export async function forwardResponsesRequest(params: {
     });
   } finally {
     clearTimeout(timeout);
+    context.signal?.removeEventListener("abort", abortUpstream);
   }
 }
