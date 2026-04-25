@@ -633,6 +633,32 @@ async function handleResponses(request: FastifyRequest, reply: FastifyReply, con
 }
 
 export async function registerRoutes(app: FastifyInstance, config: ProxyConfig): Promise<void> {
+  app.addHook("onRequest", async (request) => {
+    if (
+      request.method === "POST" &&
+      (request.url === "/responses" || request.url === "/v1/responses") &&
+      !request.headers["content-type"]
+    ) {
+      request.headers["content-type"] = "application/json";
+    }
+  });
+
+  app.addContentTypeParser("application/json", { parseAs: "string" }, (_request, body, done) => {
+    try {
+      const text = typeof body === "string" ? body : body.toString("utf8");
+      done(null, text ? JSON.parse(text) : null);
+    } catch (error) {
+      done(error as Error);
+    }
+  });
+
+  app.setErrorHandler((error, _request, reply) => {
+    if (error instanceof SyntaxError) {
+      return jsonError(reply, 400, "Invalid responses request body", "invalid_request_error", "invalid_body");
+    }
+    throw error;
+  });
+
   app.get("/healthz", async () => ({
     ok: true,
     service: "codex-ark-proxy",
