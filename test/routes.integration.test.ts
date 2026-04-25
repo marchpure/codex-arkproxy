@@ -119,6 +119,43 @@ test("responses route enforces proxy auth when configured", async () => {
   await app.close();
 });
 
+test("responses route preserves upstream error status and body", async () => {
+  const upstream = http.createServer((request, response) => {
+    request.resume();
+    response.writeHead(502, { "content-type": "application/json" });
+    response.end(JSON.stringify({ error: { message: "upstream unavailable" } }));
+  });
+  const upstreamPort = await listen(upstream);
+
+  const app = Fastify();
+  try {
+    await registerRoutes(app, {
+      ...baseConfig,
+      arkBaseUrl: `http://127.0.0.1:${upstreamPort}`
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/responses",
+      payload: {
+        model: "gpt-5.4",
+        input: "hi"
+      }
+    });
+
+    assert.equal(response.statusCode, 502);
+    assert.deepEqual(response.json(), {
+      error: {
+        message: "upstream unavailable"
+      }
+    });
+    assert.match(String(response.headers["content-type"]), /^application\/json/);
+  } finally {
+    await closeApp(app);
+    await close(upstream);
+  }
+});
+
 function listen(server: http.Server): Promise<number> {
   return new Promise((resolve, reject) => {
     server.once("error", reject);
@@ -134,9 +171,15 @@ function listen(server: http.Server): Promise<number> {
 }
 
 function close(server: http.Server): Promise<void> {
+  server.closeAllConnections();
   return new Promise((resolve, reject) => {
     server.close((error) => error ? reject(error) : resolve());
   });
+}
+
+async function closeApp(app: Fastify.FastifyInstance): Promise<void> {
+  app.server.closeAllConnections();
+  await app.close();
 }
 
 test("responses route aborts upstream request when client disconnects", async () => {
@@ -201,7 +244,66 @@ test("responses route aborts upstream request when client disconnects", async ()
     assert.equal(upstreamClosed, true);
   } finally {
     finishUpstream?.();
-    await app.close();
+    await closeApp(app);
+    await close(upstream);
+  }
+});
+
+test("responses route times out stalled upstream response bodies", async () => {
+  let upstreamClosed = false;
+  let finishUpstream: (() => void) | undefined;
+  const upstreamReleased = new Promise<void>((resolve) => {
+    finishUpstream = resolve;
+  });
+
+  const upstream = http.createServer(async (request, response) => {
+    request.resume();
+    response.on("close", () => {
+      upstreamClosed = true;
+      finishUpstream?.();
+    });
+    response.writeHead(200, { "content-type": "application/json" });
+    response.write("{");
+    await upstreamReleased;
+    if (!response.destroyed) {
+      response.end("\"id\":\"resp_1\",\"output\":[]}");
+    }
+  });
+  upstream.keepAliveTimeout = 1;
+  const upstreamPort = await listen(upstream);
+
+  const app = Fastify();
+  try {
+    await registerRoutes(app, {
+      ...baseConfig,
+      arkBaseUrl: `http://127.0.0.1:${upstreamPort}`,
+      requestTimeoutMs: 100
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/responses",
+      payload: {
+        model: "gpt-5.4",
+        input: "hi"
+      }
+    });
+
+    assert.equal(response.statusCode, 504);
+    assert.deepEqual(response.json(), {
+      error: {
+        message: "Ark request timed out",
+        type: "timeout_error",
+        code: "ark_request_timeout"
+      }
+    });
+    for (let attempt = 0; attempt < 50 && !upstreamClosed; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.equal(upstreamClosed, true);
+  } finally {
+    finishUpstream?.();
+    await closeApp(app);
     await close(upstream);
   }
 });

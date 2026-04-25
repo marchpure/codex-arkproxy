@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { ProxyConfig, ResponsesRequest } from "./types.js";
-import { forwardResponsesRequest } from "./ark-client.js";
+import { ArkRequestAbortedError, forwardResponsesRequest } from "./ark-client.js";
 import { jsonError, makeRequestId, requireProxyAuth, resolveModel } from "./utils.js";
 
 const responsesSchema = z.object({
@@ -585,31 +585,36 @@ async function handleResponses(request: FastifyRequest, reply: FastifyReply, con
     });
 
     if (!upstreamResponse.ok) {
-      const text = await upstreamResponse.text();
       request.log.error({
         requestId,
         status: upstreamResponse.status,
-        body: text
+        body: upstreamResponse.text
       }, "ark request failed");
       reply.code(upstreamResponse.status);
-      reply.header("content-type", upstreamResponse.headers.get("content-type") ?? "application/json");
-      return reply.send(text);
+      reply.header("content-type", upstreamResponse.contentType);
+      return reply.send(upstreamResponse.text);
     }
 
     reply.header("x-codex-ark-proxy-request-id", requestId);
     reply.header("x-codex-ark-upstream-model", downstreamModel);
 
-    const contentType = upstreamResponse.headers.get("content-type") ?? "application/json";
-    reply.header("content-type", contentType);
+    reply.header("content-type", upstreamResponse.contentType);
 
     if (!stream) {
-      const payload = await upstreamResponse.text();
-      return reply.send(payload);
+      return reply.send(upstreamResponse.text);
     }
 
-    const payload = await upstreamResponse.text();
-    streamNormalizedResponse(reply, payload, downstreamModel, config.streamIdleTimeoutMs);
+    streamNormalizedResponse(reply, upstreamResponse.text, downstreamModel, config.streamIdleTimeoutMs);
     return reply;
+  } catch (error) {
+    if (error instanceof ArkRequestAbortedError) {
+      if (error.reason === "client") {
+        request.log.info({ requestId }, "client disconnected before ark response completed");
+        return reply;
+      }
+      return jsonError(reply, 504, error.message, "timeout_error", "ark_request_timeout");
+    }
+    throw error;
   } finally {
     request.raw.off("aborted", abortOnClientDisconnect);
     request.raw.off("close", abortIfRequestWasAborted);

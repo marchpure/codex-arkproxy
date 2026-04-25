@@ -140,19 +140,47 @@ function buildArkHeaders(config: ProxyConfig): Headers {
   return headers;
 }
 
+export type ArkAbortReason = "client" | "timeout";
+
+export class ArkRequestAbortedError extends Error {
+  constructor(public readonly reason: ArkAbortReason) {
+    super(reason === "timeout" ? "Ark request timed out" : "Ark request was cancelled by the client");
+    this.name = "ArkRequestAbortedError";
+  }
+}
+
+export type ForwardResponsesResult = {
+  ok: boolean;
+  status: number;
+  contentType: string;
+  text: string;
+};
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
 export async function forwardResponsesRequest(params: {
   body: ResponsesRequest;
   context: ArkRequestContext;
   config: ProxyConfig;
-}): Promise<Response> {
+}): Promise<ForwardResponsesResult> {
   const { body, context, config } = params;
   const controller = new AbortController();
-  const abortUpstream = () => controller.abort();
-  const timeout = setTimeout(abortUpstream, config.requestTimeoutMs);
-  if (context.signal?.aborted) {
+  let abortReason: ArkAbortReason | undefined;
+  const abortForClient = () => {
+    abortReason = "client";
     controller.abort();
+  };
+  const abortForTimeout = () => {
+    abortReason = "timeout";
+    controller.abort();
+  };
+  const timeout = setTimeout(abortForTimeout, config.requestTimeoutMs);
+  if (context.signal?.aborted) {
+    abortForClient();
   } else {
-    context.signal?.addEventListener("abort", abortUpstream, { once: true });
+    context.signal?.addEventListener("abort", abortForClient, { once: true });
   }
 
   try {
@@ -162,14 +190,26 @@ export async function forwardResponsesRequest(params: {
       console.error("[codex-ark-proxy] downstream body", JSON.stringify(downstreamBody));
     }
 
-    return await fetch(`${config.arkBaseUrl}/responses`, {
+    const response = await fetch(`${config.arkBaseUrl}/responses`, {
       method: "POST",
       headers: buildArkHeaders(config),
       body: JSON.stringify(downstreamBody),
       signal: controller.signal
     });
+    const text = await response.text();
+    return {
+      ok: response.ok,
+      status: response.status,
+      contentType: response.headers.get("content-type") ?? "application/json",
+      text
+    };
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new ArkRequestAbortedError(abortReason ?? (context.signal?.aborted ? "client" : "timeout"));
+    }
+    throw error;
   } finally {
     clearTimeout(timeout);
-    context.signal?.removeEventListener("abort", abortUpstream);
+    context.signal?.removeEventListener("abort", abortForClient);
   }
 }
