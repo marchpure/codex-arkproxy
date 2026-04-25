@@ -156,6 +156,127 @@ test("responses route preserves upstream error status and body", async () => {
   }
 });
 
+test("responses route returns 502 when upstream connection fails", async () => {
+  const closedServer = http.createServer();
+  const upstreamPort = await listen(closedServer);
+  await close(closedServer);
+
+  const app = Fastify();
+  try {
+    await registerRoutes(app, {
+      ...baseConfig,
+      arkBaseUrl: `http://127.0.0.1:${upstreamPort}`
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/responses",
+      payload: {
+        model: "gpt-5.4",
+        input: "hi"
+      }
+    });
+
+    assert.equal(response.statusCode, 502);
+    assert.deepEqual(response.json(), {
+      error: {
+        message: "Failed to connect to Ark upstream",
+        type: "api_error",
+        code: "ark_upstream_fetch_failed"
+      }
+    });
+  } finally {
+    await closeApp(app);
+  }
+});
+
+test("streaming responses return 502 before SSE headers when upstream payload is invalid", async () => {
+  const upstream = http.createServer((request, response) => {
+    request.resume();
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end("not-json");
+  });
+  const upstreamPort = await listen(upstream);
+
+  const app = Fastify();
+  try {
+    await registerRoutes(app, {
+      ...baseConfig,
+      arkBaseUrl: `http://127.0.0.1:${upstreamPort}`
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/responses",
+      payload: {
+        model: "gpt-5.4",
+        stream: true,
+        input: "hi"
+      }
+    });
+
+    assert.equal(response.statusCode, 502);
+    assert.deepEqual(response.json(), {
+      error: {
+        message: "Ark returned an invalid streaming payload",
+        type: "api_error",
+        code: "ark_invalid_streaming_payload"
+      }
+    });
+    assert.match(String(response.headers["content-type"]), /^application\/json/);
+  } finally {
+    await closeApp(app);
+    await close(upstream);
+  }
+});
+
+test("streaming responses emit SSE frames and done sentinel", async () => {
+  const upstreamPayload = {
+    id: "resp_stream_1",
+    output: [
+      {
+        type: "message",
+        id: "msg_1",
+        role: "assistant",
+        content: [{ type: "output_text", text: "hello from stream" }]
+      }
+    ]
+  };
+  const upstream = http.createServer((request, response) => {
+    request.resume();
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify(upstreamPayload));
+  });
+  const upstreamPort = await listen(upstream);
+
+  const app = Fastify();
+  try {
+    await registerRoutes(app, {
+      ...baseConfig,
+      arkBaseUrl: `http://127.0.0.1:${upstreamPort}`
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/responses",
+      payload: {
+        model: "gpt-5.4",
+        stream: true,
+        input: "hi"
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.match(String(response.headers["content-type"]), /^text\/event-stream/);
+    assert.match(response.body, /event: response\.created/);
+    assert.match(response.body, /event: response\.output_text\.delta/);
+    assert.match(response.body, /data: \[DONE\]/);
+  } finally {
+    await closeApp(app);
+    await close(upstream);
+  }
+});
+
 function listen(server: http.Server): Promise<number> {
   return new Promise((resolve, reject) => {
     server.once("error", reject);
@@ -303,6 +424,62 @@ test("responses route times out stalled upstream response bodies", async () => {
     assert.equal(upstreamClosed, true);
   } finally {
     finishUpstream?.();
+    await closeApp(app);
+    await close(upstream);
+  }
+});
+
+test("responses route handles concurrent requests without leaving active upstream work", async () => {
+  let activeRequests = 0;
+  let maxActiveRequests = 0;
+  let completedRequests = 0;
+  const upstream = http.createServer(async (request, response) => {
+    request.resume();
+    activeRequests += 1;
+    maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    activeRequests -= 1;
+    completedRequests += 1;
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify({
+      id: `resp_${completedRequests}`,
+      output: [
+        {
+          type: "message",
+          id: "msg_1",
+          role: "assistant",
+          content: [{ type: "output_text", text: "ok" }]
+        }
+      ]
+    }));
+  });
+  const upstreamPort = await listen(upstream);
+
+  const app = Fastify();
+  try {
+    await registerRoutes(app, {
+      ...baseConfig,
+      arkBaseUrl: `http://127.0.0.1:${upstreamPort}`
+    });
+
+    const startedAt = performance.now();
+    const responses = await Promise.all(Array.from({ length: 100 }, (_, index) => app.inject({
+      method: "POST",
+      url: "/responses",
+      payload: {
+        model: "gpt-5.4",
+        stream: index % 2 === 0,
+        input: `task ${index}`
+      }
+    })));
+    const elapsedMs = performance.now() - startedAt;
+
+    assert.equal(responses.every((response) => response.statusCode === 200), true);
+    assert.equal(completedRequests, 100);
+    assert.equal(activeRequests, 0);
+    assert.ok(maxActiveRequests > 1);
+    assert.ok(elapsedMs < 5000, `concurrent smoke took ${elapsedMs}ms`);
+  } finally {
     await closeApp(app);
     await close(upstream);
   }

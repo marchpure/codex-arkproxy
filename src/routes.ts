@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { ProxyConfig, ResponsesRequest } from "./types.js";
-import { ArkRequestAbortedError, forwardResponsesRequest } from "./ark-client.js";
+import { ArkRequestAbortedError, ArkUpstreamFetchError, forwardResponsesRequest } from "./ark-client.js";
 import { jsonError, makeRequestId, requireProxyAuth, resolveModel } from "./utils.js";
 
 const responsesSchema = z.object({
@@ -493,7 +493,7 @@ export function buildStreamingEvents(payloadText: string, downstreamModel: strin
   return frames;
 }
 
-function streamNormalizedResponse(reply: FastifyReply, payloadText: string, downstreamModel: string, idleTimeoutMs: number): void {
+function streamNormalizedResponse(reply: FastifyReply, frames: StreamingEventFrame[], idleTimeoutMs: number): void {
   const resetIdleTimer = (() => {
     let timer: NodeJS.Timeout | undefined;
     return () => {
@@ -518,7 +518,7 @@ function streamNormalizedResponse(reply: FastifyReply, payloadText: string, down
     connection: "keep-alive"
   });
   try {
-    for (const frame of buildStreamingEvents(payloadText, downstreamModel)) {
+    for (const frame of frames) {
       resetIdleTimer();
       writeSse(reply, frame.event, frame.data);
     }
@@ -604,7 +604,8 @@ async function handleResponses(request: FastifyRequest, reply: FastifyReply, con
       return reply.send(upstreamResponse.text);
     }
 
-    streamNormalizedResponse(reply, upstreamResponse.text, downstreamModel, config.streamIdleTimeoutMs);
+    const frames = buildStreamingEvents(upstreamResponse.text, downstreamModel);
+    streamNormalizedResponse(reply, frames, config.streamIdleTimeoutMs);
     return reply;
   } catch (error) {
     if (error instanceof ArkRequestAbortedError) {
@@ -613,6 +614,14 @@ async function handleResponses(request: FastifyRequest, reply: FastifyReply, con
         return reply;
       }
       return jsonError(reply, 504, error.message, "timeout_error", "ark_request_timeout");
+    }
+    if (error instanceof ArkUpstreamFetchError) {
+      request.log.error({ requestId, error }, "failed to reach ark upstream");
+      return jsonError(reply, 502, error.message, "api_error", "ark_upstream_fetch_failed");
+    }
+    if (stream && error instanceof SyntaxError) {
+      request.log.error({ requestId, error }, "ark returned invalid streaming payload");
+      return jsonError(reply, 502, "Ark returned an invalid streaming payload", "api_error", "ark_invalid_streaming_payload");
     }
     throw error;
   } finally {

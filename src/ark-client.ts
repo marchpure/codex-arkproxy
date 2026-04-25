@@ -149,6 +149,13 @@ export class ArkRequestAbortedError extends Error {
   }
 }
 
+export class ArkUpstreamFetchError extends Error {
+  constructor(cause: unknown) {
+    super("Failed to connect to Ark upstream", { cause });
+    this.name = "ArkUpstreamFetchError";
+  }
+}
+
 export type ForwardResponsesResult = {
   ok: boolean;
   status: number;
@@ -207,7 +214,7 @@ export async function forwardResponsesRequest(params: {
     if (isAbortError(error)) {
       throw new ArkRequestAbortedError(abortReason ?? (context.signal?.aborted ? "client" : "timeout"));
     }
-    throw error;
+    throw new ArkUpstreamFetchError(error);
   } finally {
     clearTimeout(timeout);
     context.signal?.removeEventListener("abort", abortForClient);
