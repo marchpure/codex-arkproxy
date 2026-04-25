@@ -46,6 +46,24 @@ choose_bin_dir() {
   printf '%s\n' "$HOME/.local/bin"
 }
 
+iterate_bin_dirs() {
+  local seen=""
+  local candidate
+
+  if [[ -n "$BIN_DIR" ]]; then
+    printf '%s\n' "$BIN_DIR"
+    seen=":$BIN_DIR:"
+  fi
+
+  for candidate in /usr/local/bin /opt/homebrew/bin "$HOME/.local/bin"; do
+    if [[ "$seen" == *":$candidate:"* ]]; then
+      continue
+    fi
+    printf '%s\n' "$candidate"
+    seen="${seen}:$candidate:"
+  done
+}
+
 stop_launchd() {
   launchctl bootout "gui/$(id -u)/$LAUNCH_AGENT_LABEL" >/dev/null 2>&1 || true
   rm -f "$LAUNCH_AGENT_PATH"
@@ -81,8 +99,11 @@ stop_nohup() {
 
 remove_launcher() {
   local resolved_bin
-  resolved_bin="$(choose_bin_dir)"
-  rm -f "$resolved_bin/codex-arkproxy"
+
+  while IFS= read -r resolved_bin; do
+    [[ -z "$resolved_bin" ]] && continue
+    rm -f "$resolved_bin/codex-arkproxy"
+  done < <(iterate_bin_dirs)
 }
 
 remove_installation_files() {
