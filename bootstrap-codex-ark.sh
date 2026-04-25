@@ -60,16 +60,19 @@ download_and_extract_fallback_archive() {
 }
 
 ensure_repo() {
-  if [[ -f "$PROJECT_DIR/package.json" && -f "$PROJECT_DIR/src/server.ts" ]]; then
-    return
-  fi
-
   mkdir -p "$INSTALL_ROOT"
 
   if [[ -d "$PROJECT_DIR/.git" ]]; then
-    git -C "$PROJECT_DIR" fetch --depth=1 origin main
-    git -C "$PROJECT_DIR" reset --hard origin/main
+    if git -C "$PROJECT_DIR" fetch --depth=1 origin main && git -C "$PROJECT_DIR" reset --hard origin/main; then
+      return
+    fi
+    echo "git update failed, falling back to $FALLBACK_ARCHIVE_URL" >&2
+    download_and_extract_fallback_archive
     return
+  fi
+
+  if [[ -f "$PROJECT_DIR/package.json" && -f "$PROJECT_DIR/src/server.ts" ]]; then
+    rm -rf "$PROJECT_DIR"
   fi
 
   rm -rf "$PROJECT_DIR"
