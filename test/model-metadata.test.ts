@@ -1,5 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
 import {
   buildDerivedModelMetadata,
   findMissingMetadataKeys,
@@ -74,4 +78,24 @@ test("findMissingMetadataKeys catches incomplete metadata entries", () => {
   assert.ok(missing.includes("apply_patch_tool_type"));
   assert.ok(missing.includes("web_search_tool_type"));
   assert.ok(missing.length < REQUIRED_MODEL_METADATA_KEYS.length);
+});
+
+test("repair-model-cache initializes models_cache.json when missing", () => {
+  const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "codex-arkproxy-home-"));
+
+  execFileSync("node", ["scripts/repair-model-cache.mjs"], {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      HOME: tempHome
+    }
+  });
+
+  const cachePath = path.join(tempHome, ".codex-arkproxy", "models_cache.json");
+  const parsed = JSON.parse(fs.readFileSync(cachePath, "utf8"));
+  const slugs = parsed.models.map((model: { slug: string }) => model.slug);
+
+  assert.ok(slugs.includes("gpt-5.4"));
+  assert.ok(slugs.includes("doubao-seed-2-0-pro-260215"));
+  assert.ok(slugs.includes("doubao-seed-2-0-mini-260215"));
 });
