@@ -39,6 +39,12 @@ curl http://127.0.0.1:8787/v1/models
 codex-arkproxy exec -C /Users/bytedance/Code/arkclaw-hermes --model doubao-seed-2-0-pro-260215 "Reply with exactly: smoke-ok"
 ```
 
+## 卸载
+
+```bash
+curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/uninstall-codex-ark.sh | bash
+```
+
 ## 脚本会做什么
 
 - 拉取或更新仓库到本地安装目录
