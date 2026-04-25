@@ -3,6 +3,9 @@
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/marchpure/codex-arkproxy.git}"
+PUBLIC_BUCKET_BASE_URL="${PUBLIC_BUCKET_BASE_URL:-https://haoxingjun-test.tos-cn-beijing.volces.com}"
+FALLBACK_ARCHIVE_URL="${FALLBACK_ARCHIVE_URL:-$PUBLIC_BUCKET_BASE_URL/codex-ark-proxy.tar.gz}"
+GIT_CLONE_TIMEOUT_SEC="${GIT_CLONE_TIMEOUT_SEC:-20}"
 INSTALL_ROOT="${INSTALL_ROOT:-$HOME/.codex-arkproxy}"
 PROJECT_DIR="${PROJECT_DIR:-$INSTALL_ROOT/codex-ark-proxy}"
 CODEX_HOME_DIR="${CODEX_HOME_DIR:-$HOME/.codex-arkproxy}"
@@ -45,6 +48,17 @@ has_cmd() {
   command -v "$1" >/dev/null 2>&1
 }
 
+download_and_extract_fallback_archive() {
+  local archive_path
+  archive_path="$(mktemp /tmp/codex-ark-proxy.XXXXXX.tar.gz)"
+
+  curl -fsSL "$FALLBACK_ARCHIVE_URL" -o "$archive_path"
+  rm -rf "$PROJECT_DIR"
+  mkdir -p "$PROJECT_DIR"
+  tar -xzf "$archive_path" -C "$PROJECT_DIR"
+  rm -f "$archive_path"
+}
+
 ensure_repo() {
   if [[ -f "$PROJECT_DIR/package.json" && -f "$PROJECT_DIR/src/server.ts" ]]; then
     return
@@ -59,7 +73,18 @@ ensure_repo() {
   fi
 
   rm -rf "$PROJECT_DIR"
-  git clone --depth=1 "$REPO_URL" "$PROJECT_DIR"
+  if has_cmd timeout; then
+    if timeout "$GIT_CLONE_TIMEOUT_SEC" git clone --depth=1 "$REPO_URL" "$PROJECT_DIR"; then
+      return
+    fi
+  else
+    if git clone --depth=1 "$REPO_URL" "$PROJECT_DIR"; then
+      return
+    fi
+  fi
+
+  echo "git clone failed or timed out, falling back to $FALLBACK_ARCHIVE_URL" >&2
+  download_and_extract_fallback_archive
 }
 
 print_step() {

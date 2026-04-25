@@ -10,6 +10,8 @@
 curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark.sh | ARK_API_KEY=你的方舟Key bash
 ```
 
+如果目标机器连不上 GitHub，脚本会自动回退到公共桶里的代码包继续安装。
+
 使用：
 
 ```bash
