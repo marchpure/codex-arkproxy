@@ -138,3 +138,11 @@ test("bootstrap catalog generator emits Codex-compatible model_messages", () => 
   assert.match(script, /instructions_variables:/);
   assert.doesNotMatch(script, /model_messages: \[\]/);
 });
+
+test("bootstrap launcher pins Codex to arkproxy provider and model", () => {
+  const script = fs.readFileSync("bootstrap-codex-ark.sh", "utf8");
+  assert.match(script, /-c 'model_provider="codex"'/);
+  assert.match(script, /-c 'model="\$ARK_MODEL_DEFAULT"'/);
+  assert.match(script, /-c 'model_catalog_json="\$CODEX_HOME_DIR\/model-catalogs\/codex-arkproxy-current\.json"'/);
+  assert.match(script, /model_providers\.codex\.base_url="http:\/\/\$PROXY_HOST:\$PROXY_PORT"/);
+});

@@ -370,7 +370,15 @@ if ! command -v codex >/dev/null 2>&1; then
   exit 1
 fi
 export CODEX_HOME="$CODEX_HOME_DIR"
-exec codex "\$@"
+exec codex \
+  -c 'model_provider="codex"' \
+  -c 'model="$ARK_MODEL_DEFAULT"' \
+  -c 'model_catalog_json="$CODEX_HOME_DIR/model-catalogs/codex-arkproxy-current.json"' \
+  -c 'model_providers.codex.name="codex"' \
+  -c 'model_providers.codex.base_url="http://$PROXY_HOST:$PROXY_PORT"' \
+  -c 'model_providers.codex.wire_api="responses"' \
+  -c 'model_providers.codex.api_key="codex-arkproxy-local"' \
+  "\$@"
 EOF
   chmod +x "$launcher_path"
 
