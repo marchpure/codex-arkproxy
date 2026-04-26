@@ -149,6 +149,20 @@ function textFromContentParts(content: unknown): string {
   }).join("");
 }
 
+function normalizeChatMessageRole(role: unknown): "system" | "assistant" | "user" | "tool" {
+  switch (role) {
+    case "system":
+    case "assistant":
+    case "user":
+    case "tool":
+      return role;
+    case "developer":
+      return "system";
+    default:
+      return "user";
+  }
+}
+
 function responseInputToChatMessages(body: ResponsesRequest): Array<Record<string, unknown>> {
   const messages: Array<Record<string, unknown>> = [];
   if (typeof body.instructions === "string" && body.instructions.trim()) {
@@ -175,7 +189,7 @@ function responseInputToChatMessages(body: ResponsesRequest): Array<Record<strin
     const record = deepStripExternalWebAccess(item) as Record<string, unknown>;
     if (record.type === "message") {
       messages.push({
-        role: typeof record.role === "string" ? record.role : "user",
+        role: normalizeChatMessageRole(record.role),
         content: typeof record.content === "string" ? record.content : textFromContentParts(record.content)
       });
       continue;

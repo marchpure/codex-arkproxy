@@ -110,6 +110,21 @@ const doubaoSpecs = [
   }
 ];
 
+const configuredModels = [
+  process.env.ARK_MODEL_DEFAULT,
+  ...(process.env.EXPOSE_MODELS ?? "").split(",")
+].map((slug) => slug?.trim()).filter(Boolean);
+
+for (const slug of configuredModels) {
+  if (!doubaoSpecs.some((spec) => spec.slug === slug)) {
+    doubaoSpecs.push({
+      slug,
+      description: "Ark provider model via codex-ark-proxy.",
+      priority: 60 + doubaoSpecs.length
+    });
+  }
+}
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }

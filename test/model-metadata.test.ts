@@ -99,3 +99,24 @@ test("repair-model-cache initializes models_cache.json when missing", () => {
   assert.ok(slugs.includes("doubao-seed-2-0-pro-260215"));
   assert.ok(slugs.includes("doubao-seed-2-0-mini-260215"));
 });
+
+test("repair-model-cache includes configured exposed models", () => {
+  const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "codex-arkproxy-home-"));
+
+  execFileSync("node", ["scripts/repair-model-cache.mjs"], {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      HOME: tempHome,
+      ARK_MODEL_DEFAULT: "custom-default",
+      EXPOSE_MODELS: "custom-default, custom-extra"
+    }
+  });
+
+  const cachePath = path.join(tempHome, ".codex-arkproxy", "models_cache.json");
+  const parsed = JSON.parse(fs.readFileSync(cachePath, "utf8"));
+  const slugs = parsed.models.map((model: { slug: string }) => model.slug);
+
+  assert.ok(slugs.includes("custom-default"));
+  assert.ok(slugs.includes("custom-extra"));
+});

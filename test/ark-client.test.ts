@@ -198,6 +198,7 @@ test("buildChatCompletionsBody converts responses input and tools for Coding Pla
     model: "gpt-5.4",
     instructions: "Be concise.",
     input: [
+      { type: "message", role: "developer", content: "developer guidance" },
       { type: "message", role: "user", content: [{ type: "input_text", text: "hi" }] },
       { type: "function_call_output", call_id: "call_1", output: "ok" }
     ],
@@ -217,6 +218,7 @@ test("buildChatCompletionsBody converts responses input and tools for Coding Pla
     stream: false,
     messages: [
       { role: "system", content: "Be concise." },
+      { role: "system", content: "developer guidance" },
       { role: "user", content: "hi" },
       { role: "tool", tool_call_id: "call_1", content: "ok" }
     ],
