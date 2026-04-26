@@ -287,7 +287,14 @@ const models = [...new Set(modelIds)].map((id, index) => ({
   additional_speed_tiers: [],
   availability_nux: null,
   upgrade: null,
-  model_messages: [],
+  model_messages: {
+    instructions_template: "You are Codex, a coding agent running via codex-ark-proxy.\n\n{{ personality }}",
+    instructions_variables: {
+      personality_default: "",
+      personality_friendly: "",
+      personality_pragmatic: ""
+    }
+  },
   apply_patch_tool_type: "freeform",
   web_search_tool_type: "text_and_image",
   truncation_policy: { mode: "tokens", limit: 10000 },

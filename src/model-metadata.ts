@@ -15,7 +15,10 @@ export type CodexModelMetadata = {
   availability_nux: unknown;
   upgrade: unknown;
   base_instructions: string;
-  model_messages: unknown[];
+  model_messages: {
+    instructions_template: string;
+    instructions_variables: Record<string, string>;
+  };
   supports_reasoning_summaries: boolean;
   default_reasoning_summary: string;
   support_verbosity: boolean;

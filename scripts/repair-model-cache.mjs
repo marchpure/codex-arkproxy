@@ -30,7 +30,14 @@ const fallbackTemplate = {
   availability_nux: null,
   upgrade: null,
   base_instructions: "",
-  model_messages: [],
+  model_messages: {
+    instructions_template: "You are Codex, a coding agent running via codex-ark-proxy.\n\n{{ personality }}",
+    instructions_variables: {
+      personality_default: "",
+      personality_friendly: "",
+      personality_pragmatic: ""
+    }
+  },
   supports_reasoning_summaries: true,
   default_reasoning_summary: "auto",
   support_verbosity: true,

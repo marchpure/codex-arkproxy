@@ -30,7 +30,14 @@ const template: CodexModelMetadata = {
   availability_nux: null,
   upgrade: null,
   base_instructions: "base instructions",
-  model_messages: [],
+  model_messages: {
+    instructions_template: "base instructions\n\n{{ personality }}",
+    instructions_variables: {
+      personality_default: "",
+      personality_friendly: "",
+      personality_pragmatic: ""
+    }
+  },
   supports_reasoning_summaries: true,
   default_reasoning_summary: "none",
   support_verbosity: true,
@@ -98,6 +105,9 @@ test("repair-model-cache initializes models_cache.json when missing", () => {
   assert.ok(slugs.includes("gpt-5.4"));
   assert.ok(slugs.includes("doubao-seed-2-0-pro-260215"));
   assert.ok(slugs.includes("doubao-seed-2-0-mini-260215"));
+  const derived = parsed.models.find((model: { slug: string }) => model.slug === "doubao-seed-2-0-pro-260215");
+  assert.equal(typeof derived.model_messages.instructions_template, "string");
+  assert.equal(typeof derived.model_messages.instructions_variables, "object");
 });
 
 test("repair-model-cache includes configured exposed models", () => {
@@ -119,4 +129,12 @@ test("repair-model-cache includes configured exposed models", () => {
 
   assert.ok(slugs.includes("custom-default"));
   assert.ok(slugs.includes("custom-extra"));
+});
+
+test("bootstrap catalog generator emits Codex-compatible model_messages", () => {
+  const script = fs.readFileSync("bootstrap-codex-ark.sh", "utf8");
+  assert.match(script, /model_messages: \{/);
+  assert.match(script, /instructions_template:/);
+  assert.match(script, /instructions_variables:/);
+  assert.doesNotMatch(script, /model_messages: \[\]/);
 });
