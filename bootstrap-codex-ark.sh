@@ -29,6 +29,7 @@ PROXY_PORT="${PROXY_PORT:-8787}"
 LOG_LEVEL="${LOG_LEVEL:-info}"
 ARK_BASE_URL_WAS_SET="${ARK_BASE_URL+x}"
 ARK_BASE_URL="${ARK_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}"
+ARK_API_MODE_WAS_SET="${ARK_API_MODE+x}"
 ARK_API_MODE="${ARK_API_MODE:-responses}"
 ARK_MODEL_DEFAULT="${ARK_MODEL_DEFAULT:-doubao-seed-2-0-pro-260215}"
 ARK_API_KEY="${ARK_API_KEY:-}"
@@ -37,6 +38,8 @@ ARK_ENDPOINT="${ARK_ENDPOINT:-}"
 ARK_EXTRA_HEADERS_JSON="${ARK_EXTRA_HEADERS_JSON:-{}}"
 EXPOSE_MODELS="${EXPOSE_MODELS:-gpt-5.4,gpt-4.1,gpt-4.1-mini,doubao-seed-2-0-pro-260215,doubao-seed-2-0-mini-260215}"
 CODING_PLAN="${CODING_PLAN:-false}"
+AUTO_DETECT_ARK_API_MODE="${AUTO_DETECT_ARK_API_MODE:-true}"
+ARK_MODE_DETECT_TIMEOUT_SEC="${ARK_MODE_DETECT_TIMEOUT_SEC:-3}"
 OS_NAME="$(uname -s)"
 CODEX_AVAILABLE=false
 
@@ -49,6 +52,45 @@ if [[ "$CODING_PLAN" == "true" ]]; then
     ARK_API_MODE="chat_completions"
   fi
 fi
+
+try_auth_probe() {
+  local url="$1"
+  local status
+
+  status="$(curl -sS -o /dev/null -w '%{http_code}' \
+    --connect-timeout "$ARK_MODE_DETECT_TIMEOUT_SEC" \
+    --max-time "$ARK_MODE_DETECT_TIMEOUT_SEC" \
+    -H "Authorization: Bearer $ARK_API_KEY" \
+    "$url" 2>/dev/null || true)"
+
+  [[ "$status" =~ ^2[0-9][0-9]$|^401$|^403$ ]]
+}
+
+auto_detect_ark_api_mode() {
+  if [[ "$AUTO_DETECT_ARK_API_MODE" != "true" ]]; then
+    return
+  fi
+  if [[ "$CODING_PLAN" == "true" || -n "$ARK_API_MODE_WAS_SET" || -n "$ARK_BASE_URL_WAS_SET" || -z "$ARK_API_KEY" ]]; then
+    return
+  fi
+
+  print_step "auto-detecting Ark API mode"
+  if try_auth_probe "https://ark.cn-beijing.volces.com/api/coding/v3/models"; then
+    ARK_BASE_URL="https://ark.cn-beijing.volces.com/api/coding/v3"
+    ARK_API_MODE="chat_completions"
+    echo "detected Coding Plan compatible key; using chat_completions"
+    return
+  fi
+
+  if try_auth_probe "https://ark.cn-beijing.volces.com/api/v3/models"; then
+    ARK_BASE_URL="https://ark.cn-beijing.volces.com/api/v3"
+    ARK_API_MODE="responses"
+    echo "detected Ark Responses compatible key; using responses"
+    return
+  fi
+
+  echo "could not detect API mode from ARK_API_KEY; keeping ARK_API_MODE=$ARK_API_MODE" >&2
+}
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -591,6 +633,8 @@ main() {
 
   require_file "$PROJECT_DIR/package.json"
   require_file "$PROJECT_DIR/scripts/repair-model-cache.mjs"
+
+  auto_detect_ark_api_mode
 
   print_step "checking .env"
   ensure_env_file

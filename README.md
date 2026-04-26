@@ -54,7 +54,9 @@ curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark
 
 ## 火山引擎 Coding Plan
 
-Coding Plan 使用 OpenAI Chat Completions 兼容入口，不是默认的 Ark Responses 入口。安装时可以显式启用：
+安装脚本会在未显式设置 `ARK_API_MODE`、`ARK_BASE_URL`、`CODING_PLAN` 时，根据 `ARK_API_KEY` 优先探测 Coding Plan；探测成功会自动写入 `chat_completions` 和 `api/coding/v3`。
+
+也可以显式启用：
 
 ```bash
 curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark.sh | \
@@ -68,6 +70,12 @@ curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark
 
 - `ARK_BASE_URL=https://ark.cn-beijing.volces.com/api/coding/v3`
 - `ARK_API_MODE=chat_completions`
+
+如需关闭自动探测：
+
+```bash
+AUTO_DETECT_ARK_API_MODE=false
+```
 
 最小 smoke：
 
