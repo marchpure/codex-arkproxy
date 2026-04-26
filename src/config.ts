@@ -9,7 +9,7 @@ const envSchema = z.object({
   PROXY_PORT: z.coerce.number().int().positive().default(8787),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   ARK_BASE_URL: z.string().url(),
-  ARK_API_MODE: z.enum(["responses", "chat_completions"]).default("responses"),
+  ARK_API_MODE: z.literal("responses").default("responses"),
   ARK_API_KEY: z.string().default(""),
   ARK_REGION: z.string().default(""),
   ARK_ENDPOINT: z.string().default(""),

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildArkHeaders, buildChatCompletionsBody, buildDownstreamBody, deepStripExternalWebAccess, sanitizeTools } from "../src/ark-client.ts";
+import { buildArkHeaders, buildDownstreamBody, deepStripExternalWebAccess, sanitizeTools } from "../src/ark-client.ts";
 
 const context = {
   requestId: "req_test",
@@ -191,63 +191,4 @@ test("buildArkHeaders forwards region endpoint and safe extra headers", () => {
   assert.equal(headers.get("x-user-region"), "sg");
   assert.equal(headers.get("x-user-model"), "ep-123");
   assert.equal(headers.get("x-extra"), "extra");
-});
-
-test("buildChatCompletionsBody converts responses input and tools for Coding Plan", () => {
-  const body = buildChatCompletionsBody({
-    model: "gpt-5.4",
-    instructions: "Be concise.",
-    input: [
-      { type: "message", role: "developer", content: "developer guidance" },
-      { type: "message", role: "user", content: [{ type: "input_text", text: "hi" }] },
-      { type: "function_call", id: "fc_1", call_id: "call_1", name: "exec_command", arguments: "{\"cmd\":\"pwd\"}" },
-      { type: "function_call_output", call_id: "call_1", output: "ok" }
-    ],
-    tools: [
-      { type: "function", name: "exec_command", description: "run", parameters: { type: "object" } },
-      { type: "web_search", name: "drop" }
-    ],
-    max_output_tokens: 123,
-    temperature: 0.2
-  }, {
-    ...context,
-    downstreamModel: "doubao-coding-plan"
-  });
-
-  assert.deepEqual(body, {
-    model: "doubao-coding-plan",
-    stream: false,
-    messages: [
-      { role: "system", content: "Be concise." },
-      { role: "system", content: "developer guidance" },
-      { role: "user", content: "hi" },
-      {
-        role: "assistant",
-        content: "",
-        tool_calls: [
-          {
-            id: "call_1",
-            type: "function",
-            function: {
-              name: "exec_command",
-              arguments: "{\"cmd\":\"pwd\"}"
-            }
-          }
-        ]
-      },
-      { role: "tool", tool_call_id: "call_1", content: "ok" }
-    ],
-    tools: [
-      {
-        type: "function",
-        function: {
-          name: "exec_command",
-          description: "run",
-          parameters: { type: "object" }
-        }
-      }
-    ],
-    temperature: 0.2,
-    max_tokens: 123
-  });
 });

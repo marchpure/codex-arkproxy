@@ -52,26 +52,14 @@ curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark
 - `ARK_EXTRA_HEADERS_JSON`: 透传额外上游 header，`authorization` 和 `content-type` 会被代理保护性忽略。
 - `EXPOSE_MODELS`: 控制 `/v1/models` 和安装生成的 `model_catalog_json`，用于 Codex 内 `/model` 切换。
 
-## 火山引擎 Coding Plan
+## Ark Responses API
 
-安装脚本会在未显式设置 `ARK_API_MODE`、`ARK_BASE_URL`、`CODING_PLAN` 时，根据 `ARK_API_KEY` 优先探测 Coding Plan；探测成功会自动写入 `chat_completions` 和 `api/coding/v3`。
+`codex-ark-proxy` 只走 Ark Responses API，不走 `/chat/completions`。默认配置：
 
-也可以显式启用：
+- `ARK_BASE_URL=https://ark.cn-beijing.volces.com/api/v3`
+- `ARK_API_MODE=responses`
 
-```bash
-curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark.sh | \
-  ARK_API_KEY=你的CodingPlanKey \
-  CODING_PLAN=true \
-  ARK_MODEL_DEFAULT=doubao-seed-2-0-pro-260215 \
-  bash
-```
-
-等价手动配置：
-
-- `ARK_BASE_URL=https://ark.cn-beijing.volces.com/api/coding/v3`
-- `ARK_API_MODE=chat_completions`
-
-如需关闭自动探测：
+如需关闭安装时的 Responses API 可用性探测：
 
 ```bash
 AUTO_DETECT_ARK_API_MODE=false

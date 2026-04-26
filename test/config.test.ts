@@ -11,7 +11,7 @@ test("loadConfig normalizes base URL and parses exposed models and model map", (
   process.env.PROXY_PORT = "9999";
   process.env.LOG_LEVEL = "debug";
   process.env.ARK_BASE_URL = "https://ark.example.com///";
-  process.env.ARK_API_MODE = "chat_completions";
+  process.env.ARK_API_MODE = "responses";
   process.env.ARK_API_KEY = "test-key";
   process.env.ARK_REGION = "sg";
   process.env.ARK_ENDPOINT = "ep-123";
@@ -29,7 +29,7 @@ test("loadConfig normalizes base URL and parses exposed models and model map", (
       port: 9999,
       logLevel: "debug",
       arkBaseUrl: "https://ark.example.com",
-      arkApiMode: "chat_completions",
+      arkApiMode: "responses",
       arkApiKey: "test-key",
       arkRegion: "sg",
       arkEndpoint: "ep-123",
@@ -46,6 +46,22 @@ test("loadConfig normalizes base URL and parses exposed models and model map", (
       streamIdleTimeoutMs: 4321,
       proxyAuthToken: "token"
     });
+  } finally {
+    process.env = originalEnv;
+  }
+});
+
+test("loadConfig rejects chat completions mode", () => {
+  const originalEnv = {
+    ...process.env
+  };
+
+  process.env.ARK_BASE_URL = "https://ark.example.com";
+  process.env.ARK_MODEL_DEFAULT = "doubao-default";
+  process.env.ARK_API_MODE = "chat_completions";
+
+  try {
+    assert.throws(() => loadConfig(), /ARK_API_MODE/);
   } finally {
     process.env = originalEnv;
   }

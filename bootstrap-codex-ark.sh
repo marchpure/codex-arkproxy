@@ -37,20 +37,19 @@ ARK_REGION="${ARK_REGION:-}"
 ARK_ENDPOINT="${ARK_ENDPOINT:-}"
 ARK_EXTRA_HEADERS_JSON="${ARK_EXTRA_HEADERS_JSON:-{}}"
 EXPOSE_MODELS="${EXPOSE_MODELS:-gpt-5.4,gpt-4.1,gpt-4.1-mini,doubao-seed-2-0-pro-260215,doubao-seed-2-0-mini-260215}"
-CODING_PLAN="${CODING_PLAN:-false}"
 AUTO_DETECT_ARK_API_MODE="${AUTO_DETECT_ARK_API_MODE:-true}"
 ARK_MODE_DETECT_TIMEOUT_SEC="${ARK_MODE_DETECT_TIMEOUT_SEC:-3}"
 OS_NAME="$(uname -s)"
 CODEX_AVAILABLE=false
 
-if [[ "$CODING_PLAN" == "true" ]]; then
-  if [[ -z "$ARK_BASE_URL_WAS_SET" ]]; then
-    ARK_BASE_URL="https://ark.cn-beijing.volces.com/api/coding/v3"
-  fi
-  ARK_API_MODE="${ARK_API_MODE:-chat_completions}"
-  if [[ "$ARK_API_MODE" == "responses" ]]; then
-    ARK_API_MODE="chat_completions"
-  fi
+if [[ "${CODING_PLAN:-false}" == "true" ]]; then
+  echo "CODING_PLAN=true is no longer supported; codex-ark-proxy only uses Ark Responses API." >&2
+  exit 1
+fi
+
+if [[ "$ARK_API_MODE" != "responses" ]]; then
+  echo "ARK_API_MODE=$ARK_API_MODE is not supported; codex-ark-proxy only uses responses." >&2
+  exit 1
 fi
 
 try_auth_probe() {
@@ -70,18 +69,11 @@ auto_detect_ark_api_mode() {
   if [[ "$AUTO_DETECT_ARK_API_MODE" != "true" ]]; then
     return
   fi
-  if [[ "$CODING_PLAN" == "true" || -n "$ARK_API_MODE_WAS_SET" || -n "$ARK_BASE_URL_WAS_SET" || -z "$ARK_API_KEY" ]]; then
+  if [[ -n "$ARK_API_MODE_WAS_SET" || -n "$ARK_BASE_URL_WAS_SET" || -z "$ARK_API_KEY" ]]; then
     return
   fi
 
   print_step "auto-detecting Ark API mode"
-  if try_auth_probe "https://ark.cn-beijing.volces.com/api/coding/v3/models"; then
-    ARK_BASE_URL="https://ark.cn-beijing.volces.com/api/coding/v3"
-    ARK_API_MODE="chat_completions"
-    echo "detected Coding Plan compatible key; using chat_completions"
-    return
-  fi
-
   if try_auth_probe "https://ark.cn-beijing.volces.com/api/v3/models"; then
     ARK_BASE_URL="https://ark.cn-beijing.volces.com/api/v3"
     ARK_API_MODE="responses"

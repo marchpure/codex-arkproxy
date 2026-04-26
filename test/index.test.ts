@@ -1,6 +1,4 @@
 import "./ark-client.test.ts";
-import "./codex-client-compat.test.ts";
-import "./coding-plan-matrix.test.ts";
 import "./config.test.ts";
 import "./complex-scenarios.test.ts";
 import "./matrix.test.ts";

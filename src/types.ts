@@ -1,5 +1,5 @@
 export type ModelMap = Record<string, string>;
-export type ArkApiMode = "responses" | "chat_completions";
+export type ArkApiMode = "responses";
 
 export type ProxyConfig = {
   host: string;
