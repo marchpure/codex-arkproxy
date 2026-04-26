@@ -41,12 +41,38 @@ export function normalizeResponseForStreaming(payload: Record<string, unknown>, 
   const response = (payload.response && typeof payload.response === "object")
     ? payload.response as Record<string, unknown>
     : payload;
+  const usage = normalizeResponsesUsage(response.usage);
 
   return {
     ...response,
     model: response.model ?? downstreamModel,
     object: response.object ?? "response",
-    status: response.status ?? "completed"
+    status: response.status ?? "completed",
+    ...(usage ? { usage } : {})
+  };
+}
+
+function numberField(record: Record<string, unknown>, key: string): number | undefined {
+  return typeof record[key] === "number" && Number.isFinite(record[key])
+    ? record[key]
+    : undefined;
+}
+
+export function normalizeResponsesUsage(usage: unknown): Record<string, unknown> | undefined {
+  if (!usage || typeof usage !== "object" || Array.isArray(usage)) {
+    return undefined;
+  }
+
+  const record = usage as Record<string, unknown>;
+  const inputTokens = numberField(record, "input_tokens") ?? numberField(record, "prompt_tokens") ?? 0;
+  const outputTokens = numberField(record, "output_tokens") ?? numberField(record, "completion_tokens") ?? 0;
+  const totalTokens = numberField(record, "total_tokens") ?? inputTokens + outputTokens;
+
+  return {
+    ...record,
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    total_tokens: totalTokens
   };
 }
 
@@ -555,6 +581,8 @@ function normalizeChatCompletionsPayload(payloadText: string, downstreamModel: s
     });
   }
 
+  const usage = normalizeResponsesUsage(record.usage);
+
   return {
     id: typeof record.id === "string" ? record.id : makeRequestId(),
     object: "response",
@@ -562,7 +590,7 @@ function normalizeChatCompletionsPayload(payloadText: string, downstreamModel: s
     model: typeof record.model === "string" ? record.model : downstreamModel,
     status: "completed",
     output,
-    usage: record.usage
+    ...(usage ? { usage } : {})
   };
 }
 

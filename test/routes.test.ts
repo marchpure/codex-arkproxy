@@ -6,6 +6,7 @@ import {
   extractOutputText,
   normalizeUpstreamPayload,
   normalizeResponseForStreaming,
+  normalizeResponsesUsage,
   pickAssistantMessage
 } from "../src/routes.ts";
 
@@ -24,6 +25,41 @@ test("normalizeResponseForStreaming fills response defaults", () => {
       status: "completed"
     }
   );
+});
+
+test("normalizeResponsesUsage converts chat completions usage into responses usage", () => {
+  assert.deepEqual(
+    normalizeResponsesUsage({
+      prompt_tokens: 7,
+      completion_tokens: 3,
+      total_tokens: 10
+    }),
+    {
+      prompt_tokens: 7,
+      completion_tokens: 3,
+      total_tokens: 10,
+      input_tokens: 7,
+      output_tokens: 3
+    }
+  );
+});
+
+test("normalizeResponseForStreaming fills response usage token fields", () => {
+  const normalized = normalizeResponseForStreaming(
+    {
+      id: "resp_1",
+      usage: {
+        total_tokens: 12
+      }
+    },
+    "doubao-seed-2-0-pro-260215"
+  );
+
+  assert.deepEqual(normalized.usage, {
+    total_tokens: 12,
+    input_tokens: 0,
+    output_tokens: 0
+  });
 });
 
 test("pickAssistantMessage returns the assistant message item only", () => {
@@ -177,7 +213,7 @@ test("normalizeUpstreamPayload converts chat completions text into responses out
           }
         }
       ],
-      usage: { total_tokens: 10 }
+      usage: { prompt_tokens: 4, completion_tokens: 6, total_tokens: 10 }
     }), "fallback-model", "chat_completions"),
     {
       id: "chatcmpl_1",
@@ -194,9 +230,38 @@ test("normalizeUpstreamPayload converts chat completions text into responses out
           content: [{ type: "output_text", text: "coding plan answer" }]
         }
       ],
-      usage: { total_tokens: 10 }
+      usage: {
+        prompt_tokens: 4,
+        completion_tokens: 6,
+        total_tokens: 10,
+        input_tokens: 4,
+        output_tokens: 6
+      }
     }
   );
+});
+
+test("buildStreamingEvents includes completed usage required by Codex parser", () => {
+  const frames = buildStreamingEvents(JSON.stringify({
+    id: "resp_usage_1",
+    usage: { total_tokens: 10 },
+    output: [
+      {
+        type: "message",
+        id: "msg_1",
+        role: "assistant",
+        content: [{ type: "output_text", text: "done" }]
+      }
+    ]
+  }), "doubao-seed-2-0-pro-260215");
+
+  const completed = frames.find((frame) => frame.event === "response.completed");
+  const response = completed?.data.response as Record<string, unknown>;
+  assert.deepEqual(response.usage, {
+    total_tokens: 10,
+    input_tokens: 0,
+    output_tokens: 0
+  });
 });
 
 test("normalizeUpstreamPayload converts chat completions tool calls into response function calls", () => {

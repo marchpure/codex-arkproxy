@@ -169,6 +169,25 @@ function toolsForScenario(index: number): unknown[] | undefined {
   ];
 }
 
+function parseSseFrames(body: string): Array<{ event?: string; data?: unknown }> {
+  return body.trim().split("\n\n").flatMap((frame) => {
+    const event = frame.split("\n").find((line) => line.startsWith("event: "))?.slice("event: ".length);
+    const dataLine = frame.split("\n").find((line) => line.startsWith("data: "));
+    if (!dataLine || dataLine === "data: [DONE]") {
+      return [];
+    }
+    return [{ event, data: JSON.parse(dataLine.slice("data: ".length)) as unknown }];
+  });
+}
+
+function assertResponsesUsage(usage: unknown): void {
+  assert.ok(usage && typeof usage === "object" && !Array.isArray(usage));
+  const record = usage as Record<string, unknown>;
+  assert.equal(typeof record.input_tokens, "number");
+  assert.equal(typeof record.output_tokens, "number");
+  assert.equal(typeof record.total_tokens, "number");
+}
+
 for (let index = 0; index < SCENARIO_COUNT; index += 1) {
   test(`coding plan strict matrix ${index}`, async () => {
     const stream = index % 2 === 0;
@@ -214,11 +233,16 @@ for (let index = 0; index < SCENARIO_COUNT; index += 1) {
       assert.match(response.body, /event: response\.created/);
       assert.match(response.body, /event: response\.completed/);
       assert.ok(response.body.includes("data: [DONE]"));
+      const completed = parseSseFrames(response.body).find((frame) => frame.event === "response.completed");
+      const completedData = completed?.data as Record<string, unknown>;
+      const completedResponse = completedData.response as Record<string, unknown>;
+      assertResponsesUsage(completedResponse.usage);
     } else {
       const payload = response.json();
       assert.equal(payload.object, "response");
       assert.equal(payload.status, "completed");
       assert.match(payload.output[0].content[0].text, /^coding-plan-ok-/);
+      assertResponsesUsage(payload.usage);
     }
   });
 }
