@@ -4,6 +4,30 @@ import type { ProxyConfig } from "./types.js";
 
 dotenv.config();
 
+function normalizeBaseUrl(value: string): string {
+  return value.replace(/\/+$/, "");
+}
+
+function isLocalProxyUrl(baseUrl: string, host: string, port: number): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(baseUrl);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return false;
+  }
+
+  const normalizedHost = host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host;
+  const localHosts = new Set(["127.0.0.1", "localhost", "::1"]);
+  const configuredHosts = new Set([normalizedHost, "127.0.0.1", "localhost"]);
+  const parsedPort = Number(parsed.port || (parsed.protocol === "https:" ? 443 : 80));
+
+  return parsedPort === port && localHosts.has(parsed.hostname) && configuredHosts.has(normalizedHost);
+}
+
 const envSchema = z.object({
   PROXY_HOST: z.string().default("127.0.0.1"),
   PROXY_PORT: z.coerce.number().int().positive().default(8787),
@@ -26,12 +50,20 @@ export function loadConfig(): ProxyConfig {
   const env = envSchema.parse(process.env);
   const parsedMap = z.record(z.string(), z.string()).parse(JSON.parse(env.MODEL_MAP_JSON));
   const extraHeaders = z.record(z.string(), z.string()).parse(JSON.parse(env.ARK_EXTRA_HEADERS_JSON));
+  const arkBaseUrl = normalizeBaseUrl(env.ARK_BASE_URL);
+
+  if (isLocalProxyUrl(arkBaseUrl, env.PROXY_HOST, env.PROXY_PORT)) {
+    throw new Error(
+      `ARK_BASE_URL points to the local proxy (${arkBaseUrl}). ` +
+      "Set ARK_BASE_URL to the real Ark Responses API endpoint, for example https://ark.cn-beijing.volces.com/api/v3."
+    );
+  }
 
   return {
     host: env.PROXY_HOST,
     port: env.PROXY_PORT,
     logLevel: env.LOG_LEVEL,
-    arkBaseUrl: env.ARK_BASE_URL.replace(/\/+$/, ""),
+    arkBaseUrl,
     arkApiMode: env.ARK_API_MODE,
     arkApiKey: env.ARK_API_KEY,
     arkRegion: env.ARK_REGION,

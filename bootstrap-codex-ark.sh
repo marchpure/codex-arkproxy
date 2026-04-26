@@ -87,6 +87,24 @@ auto_detect_ark_api_mode() {
   echo "could not detect API mode from ARK_API_KEY; keeping ARK_API_MODE=$ARK_API_MODE" >&2
 }
 
+validate_ark_base_url() {
+  local proxy_url
+  proxy_url="http://$PROXY_HOST:$PROXY_PORT"
+
+  if [[ "$ARK_BASE_URL" == "$proxy_url" || "$ARK_BASE_URL" == "$proxy_url/" ]]; then
+    cat >&2 <<EOF
+ARK_BASE_URL points to the local codex-ark-proxy itself: $ARK_BASE_URL
+
+ARK_BASE_URL must be the real Ark Responses API endpoint, for example:
+  https://ark.cn-beijing.volces.com/api/v3
+
+If this came from your shell environment, unset it and rerun:
+  unset ARK_BASE_URL
+EOF
+    exit 1
+  fi
+}
+
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "missing required command: $1" >&2
@@ -341,6 +359,33 @@ choose_bin_dir() {
   printf '%s\n' "$HOME/.local/bin"
 }
 
+iterate_bin_dirs() {
+  local seen=""
+  local candidate
+
+  if [[ -n "$BIN_DIR" ]]; then
+    printf '%s\n' "$BIN_DIR"
+    seen=":$BIN_DIR:"
+  fi
+
+  for candidate in /usr/local/bin /opt/homebrew/bin "$HOME/.local/bin"; do
+    if [[ "$seen" == *":$candidate:"* ]]; then
+      continue
+    fi
+    printf '%s\n' "$candidate"
+    seen="${seen}:$candidate:"
+  done
+}
+
+remove_legacy_launchers() {
+  local resolved_bin
+
+  while IFS= read -r resolved_bin; do
+    [[ -z "$resolved_bin" ]] && continue
+    rm -f "$resolved_bin/codex-arkproxy"
+  done < <(iterate_bin_dirs)
+}
+
 install_launcher() {
   local launcher_path
   local shell_rc
@@ -412,10 +457,7 @@ exec "\$codex_bin" \
 EOF
   chmod +x "$launcher_path"
 
-  # Remove the old launcher name from earlier versions so codex-ark is the single user-facing entrypoint.
-  if [[ "$ARK_LAUNCHER_NAME" != "codex-arkproxy" ]]; then
-    rm -f "$BIN_DIR/codex-arkproxy"
-  fi
+  remove_legacy_launchers
 
   if [[ "$BIN_DIR" == "$HOME/.local/bin" ]]; then
     if ! grep -Fq 'export PATH="$HOME/.local/bin:$PATH"' "$shell_rc"; then
@@ -677,6 +719,7 @@ main() {
   require_file "$PROJECT_DIR/scripts/repair-model-cache.mjs"
 
   auto_detect_ark_api_mode
+  validate_ark_base_url
 
   print_step "checking .env"
   ensure_env_file

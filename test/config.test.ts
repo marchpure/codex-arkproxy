@@ -66,3 +66,21 @@ test("loadConfig rejects chat completions mode", () => {
     process.env = originalEnv;
   }
 });
+
+test("loadConfig rejects ARK_BASE_URL pointing to the local proxy", () => {
+  const originalEnv = {
+    ...process.env
+  };
+
+  process.env.PROXY_HOST = "127.0.0.1";
+  process.env.PROXY_PORT = "8787";
+  process.env.ARK_BASE_URL = "http://127.0.0.1:8787";
+  process.env.ARK_MODEL_DEFAULT = "doubao-default";
+  process.env.ARK_API_MODE = "responses";
+
+  try {
+    assert.throws(() => loadConfig(), /ARK_BASE_URL points to the local proxy/);
+  } finally {
+    process.env = originalEnv;
+  }
+});

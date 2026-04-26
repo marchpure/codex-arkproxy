@@ -144,6 +144,8 @@ test("bootstrap launcher installs codex-ark and pins it to arkproxy provider", (
   const script = fs.readFileSync("bootstrap-codex-ark.sh", "utf8");
   assert.match(script, /ARK_LAUNCHER_NAME="\$\{ARK_LAUNCHER_NAME:-codex-ark\}"/);
   assert.match(script, /launcher_path="\$BIN_DIR\/\$ARK_LAUNCHER_NAME"/);
+  assert.match(script, /remove_legacy_launchers/);
+  assert.match(script, /rm -f "\$resolved_bin\/codex-arkproxy"/);
   assert.match(script, /-c 'model_provider="codex-arkproxy-local"'/);
   assert.match(script, /-c 'model="\$ARK_MODEL_DEFAULT"'/);
   assert.match(script, /-c 'model_catalog_json="\$CODEX_HOME_DIR\/model-catalogs\/codex-arkproxy-current\.json"'/);
@@ -165,4 +167,11 @@ test("bootstrap does not install or configure native codex auth", () => {
   assert.doesNotMatch(script, /OPENAI_API_KEY="\$\{OPENAI_API_KEY:-\}"/);
   assert.doesNotMatch(script, /codex login --with-api-key/);
   assert.doesNotMatch(script, /auth\.OPENAI_API_KEY/);
+});
+
+test("bootstrap rejects ARK_BASE_URL pointing at local proxy", () => {
+  const script = fs.readFileSync("bootstrap-codex-ark.sh", "utf8");
+  assert.match(script, /validate_ark_base_url\(\)/);
+  assert.match(script, /ARK_BASE_URL points to the local codex-ark-proxy itself/);
+  assert.match(script, /unset ARK_BASE_URL/);
 });
