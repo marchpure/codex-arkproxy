@@ -17,8 +17,6 @@ SYSTEMD_SYSTEM_PATH="${SYSTEMD_SYSTEM_PATH:-/etc/systemd/system/$SERVICE_NAME.se
 RUNNER_PATH="${RUNNER_PATH:-$INSTALL_ROOT/run-proxy.sh}"
 PID_FILE="${PID_FILE:-$INSTALL_ROOT/$SERVICE_NAME.pid}"
 LOG_DIR="${LOG_DIR:-$INSTALL_ROOT/logs}"
-REMOVE_CODEX_CLI="${REMOVE_CODEX_CLI:-false}"
-CODEX_NPM_PACKAGE="${CODEX_NPM_PACKAGE:-@openai/codex}"
 OS_NAME="$(uname -s)"
 
 has_cmd() {
@@ -119,16 +117,6 @@ remove_codex_home_if_empty() {
   fi
 }
 
-remove_codex_cli_if_requested() {
-  if [[ "$REMOVE_CODEX_CLI" != "true" ]]; then
-    return
-  fi
-
-  if has_cmd npm; then
-    npm uninstall -g "$CODEX_NPM_PACKAGE" >/dev/null 2>&1 || true
-  fi
-}
-
 main() {
   print_step "stopping background service"
 
@@ -148,11 +136,6 @@ main() {
   print_step "removing installation files"
   remove_installation_files
   remove_codex_home_if_empty
-
-  if [[ "$REMOVE_CODEX_CLI" == "true" ]]; then
-    print_step "removing codex CLI"
-    remove_codex_cli_if_requested
-  fi
 
   cat <<EOF
 

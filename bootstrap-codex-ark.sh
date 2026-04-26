@@ -23,10 +23,6 @@ RUNNER_PATH="${RUNNER_PATH:-$INSTALL_ROOT/run-proxy.sh}"
 PID_FILE="${PID_FILE:-$INSTALL_ROOT/$SERVICE_NAME.pid}"
 LOG_DIR="${LOG_DIR:-$INSTALL_ROOT/logs}"
 SERVICE_MANAGER="${SERVICE_MANAGER:-}"
-INSTALL_CODEX_CLI="${INSTALL_CODEX_CLI:-true}"
-CODEX_NPM_PACKAGE="${CODEX_NPM_PACKAGE:-@openai/codex}"
-OPENAI_API_KEY="${OPENAI_API_KEY:-}"
-CONFIGURE_OPENAI_AUTH="${CONFIGURE_OPENAI_AUTH:-auto}"
 PROXY_HOST="${PROXY_HOST:-127.0.0.1}"
 PROXY_PORT="${PROXY_PORT:-8787}"
 LOG_LEVEL="${LOG_LEVEL:-info}"
@@ -44,7 +40,6 @@ EXPOSE_MODELS="${EXPOSE_MODELS:-doubao-seed-2-0-pro-260215,doubao-seed-2-0-mini-
 AUTO_DETECT_ARK_API_MODE="${AUTO_DETECT_ARK_API_MODE:-true}"
 ARK_MODE_DETECT_TIMEOUT_SEC="${ARK_MODE_DETECT_TIMEOUT_SEC:-3}"
 OS_NAME="$(uname -s)"
-CODEX_AVAILABLE=false
 
 if [[ "${CODING_PLAN:-false}" == "true" ]]; then
   echo "CODING_PLAN=true is no longer supported; codex-ark-proxy only uses Ark Responses API." >&2
@@ -108,66 +103,6 @@ require_file() {
 
 has_cmd() {
   command -v "$1" >/dev/null 2>&1
-}
-
-ensure_codex_cli() {
-  if has_cmd codex; then
-    CODEX_AVAILABLE=true
-    echo "codex CLI already installed; keeping the existing codex command unchanged"
-    return
-  fi
-
-  if [[ "$INSTALL_CODEX_CLI" != "true" ]]; then
-    return
-  fi
-
-  print_step "installing codex CLI"
-  npm install -g "$CODEX_NPM_PACKAGE"
-
-  if has_cmd codex; then
-    CODEX_AVAILABLE=true
-  fi
-}
-
-configure_openai_auth() {
-  if [[ "$CONFIGURE_OPENAI_AUTH" == "false" || "$CONFIGURE_OPENAI_AUTH" == "0" ]]; then
-    return
-  fi
-
-  if [[ -z "$OPENAI_API_KEY" ]]; then
-    return
-  fi
-
-  if [[ "$CODEX_AVAILABLE" != "true" ]]; then
-    echo "OPENAI_API_KEY was provided, but codex CLI is not available; skipping native codex auth setup" >&2
-    return
-  fi
-
-  print_step "configuring native codex OpenAI auth"
-  if printf '%s\n' "$OPENAI_API_KEY" | codex login --with-api-key >/dev/null 2>&1; then
-    echo "native codex OpenAI auth configured"
-    return
-  fi
-
-  echo "codex login --with-api-key failed; writing ~/.codex/auth.json directly" >&2
-  OPENAI_API_KEY_VALUE="$OPENAI_API_KEY" node <<'NODE'
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-
-const authDir = path.join(os.homedir(), ".codex");
-const authPath = path.join(authDir, "auth.json");
-fs.mkdirSync(authDir, { recursive: true, mode: 0o700 });
-
-let auth = {};
-try {
-  auth = JSON.parse(fs.readFileSync(authPath, "utf8"));
-} catch {}
-
-auth.OPENAI_API_KEY = process.env.OPENAI_API_KEY_VALUE;
-fs.writeFileSync(authPath, `${JSON.stringify(auth, null, 2)}\n`, { mode: 0o600 });
-fs.chmodSync(authPath, 0o600);
-NODE
 }
 
 download_and_extract_fallback_archive() {
@@ -713,15 +648,6 @@ proxy checks:
   curl http://$PROXY_HOST:$PROXY_PORT/v1/models
 EOF
 
-  if [[ "$CODEX_AVAILABLE" != "true" ]]; then
-    cat <<EOF
-
-codex CLI was not found during install.
-install codex first, then run:
-  $ARK_LAUNCHER_NAME
-EOF
-  fi
-
   case "$SERVICE_MANAGER" in
     launchd)
       printf 'launch agent:\n  %s\n' "$LAUNCH_AGENT_PATH"
@@ -742,8 +668,7 @@ main() {
   require_cmd node
   require_cmd npm
   require_cmd git
-  ensure_codex_cli
-  configure_openai_auth
+  require_cmd codex
 
   print_step "preparing project files"
   ensure_repo

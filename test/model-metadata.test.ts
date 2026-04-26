@@ -158,12 +158,11 @@ test("bootstrap launcher rejects gpt models because codex-ark is doubao-only", (
   assert.doesNotMatch(script, /unset CODEX_HOME/);
 });
 
-test("bootstrap optionally configures native codex OpenAI auth", () => {
+test("bootstrap does not install or configure native codex auth", () => {
   const script = fs.readFileSync("bootstrap-codex-ark.sh", "utf8");
-  assert.match(script, /OPENAI_API_KEY="\$\{OPENAI_API_KEY:-\}"/);
-  assert.match(script, /CONFIGURE_OPENAI_AUTH="\$\{CONFIGURE_OPENAI_AUTH:-auto\}"/);
-  assert.match(script, /configure_openai_auth\(\)/);
-  assert.match(script, /codex login --with-api-key/);
-  assert.match(script, /auth\.OPENAI_API_KEY = process\.env\.OPENAI_API_KEY_VALUE/);
-  assert.doesNotMatch(script, /upsert_env_var "\$env_file" OPENAI_API_KEY/);
+  assert.match(script, /require_cmd codex/);
+  assert.doesNotMatch(script, /npm install -g "\$CODEX_NPM_PACKAGE"/);
+  assert.doesNotMatch(script, /OPENAI_API_KEY="\$\{OPENAI_API_KEY:-\}"/);
+  assert.doesNotMatch(script, /codex login --with-api-key/);
+  assert.doesNotMatch(script, /auth\.OPENAI_API_KEY/);
 });
