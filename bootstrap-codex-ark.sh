@@ -36,7 +36,8 @@ ARK_API_KEY="${ARK_API_KEY:-}"
 ARK_REGION="${ARK_REGION:-}"
 ARK_ENDPOINT="${ARK_ENDPOINT:-}"
 ARK_EXTRA_HEADERS_JSON="${ARK_EXTRA_HEADERS_JSON:-{}}"
-EXPOSE_MODELS="${EXPOSE_MODELS:-gpt-5.4,gpt-4.1,gpt-4.1-mini,doubao-seed-2-0-pro-260215,doubao-seed-2-0-mini-260215}"
+EXPOSE_MODELS_WAS_SET="${EXPOSE_MODELS+x}"
+EXPOSE_MODELS="${EXPOSE_MODELS:-doubao-seed-2-0-pro-260215,doubao-seed-2-0-mini-260215}"
 AUTO_DETECT_ARK_API_MODE="${AUTO_DETECT_ARK_API_MODE:-true}"
 ARK_MODE_DETECT_TIMEOUT_SEC="${ARK_MODE_DETECT_TIMEOUT_SEC:-3}"
 OS_NAME="$(uname -s)"
@@ -50,6 +51,10 @@ fi
 if [[ "$ARK_API_MODE" != "responses" ]]; then
   echo "ARK_API_MODE=$ARK_API_MODE is not supported; codex-ark-proxy only uses responses." >&2
   exit 1
+fi
+
+if [[ -z "$EXPOSE_MODELS_WAS_SET" ]]; then
+  EXPOSE_MODELS="doubao-seed-2-0-pro-260215,doubao-seed-2-0-mini-260215"
 fi
 
 try_auth_probe() {
@@ -122,13 +127,24 @@ ensure_codex_cli() {
 
 download_and_extract_fallback_archive() {
   local archive_path
+  local env_backup_path
   archive_path="$(mktemp /tmp/codex-ark-proxy.XXXXXX.tar.gz)"
+  env_backup_path=""
+
+  if [[ -f "$PROJECT_DIR/.env" ]]; then
+    env_backup_path="$(mktemp /tmp/codex-ark-proxy-env.XXXXXX)"
+    cp "$PROJECT_DIR/.env" "$env_backup_path"
+  fi
 
   curl -fsSL "$FALLBACK_ARCHIVE_URL" -o "$archive_path"
   rm -rf "$PROJECT_DIR"
   mkdir -p "$PROJECT_DIR"
   tar -xzf "$archive_path" -C "$PROJECT_DIR"
   rm -f "$archive_path"
+  if [[ -n "$env_backup_path" && -f "$env_backup_path" ]]; then
+    cp "$env_backup_path" "$PROJECT_DIR/.env"
+    rm -f "$env_backup_path"
+  fi
 }
 
 ensure_repo() {
@@ -235,7 +251,7 @@ setup_codex_home() {
   mkdir -p "$(dirname "$model_catalog_path")"
 
   cat >"$CODEX_HOME_DIR/config.toml" <<EOF
-model_provider = "codex"
+model_provider = "codex-arkproxy-local"
 model = "$ARK_MODEL_DEFAULT"
 model_catalog_json = "$model_catalog_path"
 model_reasoning_effort = "medium"
@@ -244,10 +260,11 @@ approval_policy = "never"
 sandbox_mode = "danger-full-access"
 disable_response_storage = true
 
-[model_providers.codex]
-name = "codex"
+[model_providers.codex-arkproxy-local]
+name = "codex-arkproxy-local"
 base_url = "http://$PROXY_HOST:$PROXY_PORT"
 wire_api = "responses"
+api_key = "codex-arkproxy-local"
 EOF
 
   node - "$model_catalog_path" "$EXPOSE_MODELS" "$ARK_MODEL_DEFAULT" <<'NODE'
@@ -357,19 +374,60 @@ install_launcher() {
   cat >"$launcher_path" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
-if ! command -v codex >/dev/null 2>&1; then
+resolve_real_codex() {
+  local self candidate
+  self="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd -P)/\$(basename "\${BASH_SOURCE[0]}")"
+  for candidate in \\
+    "\${REAL_CODEX_BIN:-}" \\
+    "$HOME/.nvm/versions/node/v24.8.0/bin/codex" \\
+    "$HOME/.nvm/versions/node/v24.9.0/bin/codex" \\
+    "$HOME/.nvm/versions/node/v24/bin/codex" \\
+    "$HOME/.nvm/versions/node/v22/bin/codex" \\
+    /opt/homebrew/bin/codex \\
+    /usr/local/bin/codex \\
+    "\$(command -v codex 2>/dev/null || true)"; do
+    [[ -n "\$candidate" && -x "\$candidate" ]] || continue
+    [[ "\$(cd "\$(dirname "\$candidate")" && pwd -P)/\$(basename "\$candidate")" != "\$self" ]] || continue
+    printf '%s\\n' "\$candidate"
+    return 0
+  done
+  return 1
+}
+
+requested_model=""
+previous_was_model=0
+for arg in "\$@"; do
+  if [[ "\$previous_was_model" == "1" ]]; then
+    requested_model="\$arg"
+    break
+  fi
+  case "\$arg" in
+    --model=*) requested_model="\${arg#--model=}"; break ;;
+    -m=*) requested_model="\${arg#-m=}"; break ;;
+    --model|-m) previous_was_model=1 ;;
+  esac
+done
+
+codex_bin="\$(resolve_real_codex || true)"
+if [[ -z "\$codex_bin" ]]; then
   echo "codex CLI is not installed. Install codex first, then rerun: codex-arkproxy --model $ARK_MODEL_DEFAULT" >&2
   exit 1
 fi
+
+if [[ "\$requested_model" == gpt-* ]]; then
+  unset CODEX_HOME
+  exec "\$codex_bin" "\$@"
+fi
+
 export CODEX_HOME="$CODEX_HOME_DIR"
-exec codex \
-  -c 'model_provider="codex"' \
+exec "\$codex_bin" \
+  -c 'model_provider="codex-arkproxy-local"' \
   -c 'model="$ARK_MODEL_DEFAULT"' \
   -c 'model_catalog_json="$CODEX_HOME_DIR/model-catalogs/codex-arkproxy-current.json"' \
-  -c 'model_providers.codex.name="codex"' \
-  -c 'model_providers.codex.base_url="http://$PROXY_HOST:$PROXY_PORT"' \
-  -c 'model_providers.codex.wire_api="responses"' \
-  -c 'model_providers.codex.api_key="codex-arkproxy-local"' \
+  -c 'model_providers.codex-arkproxy-local.name="codex-arkproxy-local"' \
+  -c 'model_providers.codex-arkproxy-local.base_url="http://$PROXY_HOST:$PROXY_PORT"' \
+  -c 'model_providers.codex-arkproxy-local.wire_api="responses"' \
+  -c 'model_providers.codex-arkproxy-local.api_key="codex-arkproxy-local"' \
   "\$@"
 EOF
   chmod +x "$launcher_path"

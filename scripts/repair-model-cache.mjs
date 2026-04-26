@@ -120,7 +120,7 @@ const doubaoSpecs = [
 const configuredModels = [
   process.env.ARK_MODEL_DEFAULT,
   ...(process.env.EXPOSE_MODELS ?? "").split(",")
-].map((slug) => slug?.trim()).filter(Boolean);
+].map((slug) => slug?.trim()).filter((slug) => Boolean(slug) && !slug.startsWith("gpt-"));
 
 for (const slug of configuredModels) {
   if (!doubaoSpecs.some((spec) => spec.slug === slug)) {
@@ -150,7 +150,12 @@ function missingKeys(model) {
   return requiredKeys.filter((key) => !(key in model));
 }
 
-const repairedModels = parsed.models.filter((model) => !doubaoSpecs.some((spec) => spec.slug === model?.slug));
+const repairedModels = parsed.models.filter((model) => {
+  const slug = model?.slug;
+  return typeof slug === "string"
+    && !slug.startsWith("gpt-")
+    && !doubaoSpecs.some((spec) => spec.slug === slug);
+});
 for (const spec of doubaoSpecs) {
   const derived = buildDerivedModel(spec);
   const missing = missingKeys(derived);

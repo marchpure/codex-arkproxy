@@ -15,8 +15,8 @@ const envSchema = z.object({
   ARK_ENDPOINT: z.string().default(""),
   ARK_EXTRA_HEADERS_JSON: z.string().default("{}"),
   ARK_MODEL_DEFAULT: z.string().min(1),
-  EXPOSE_MODELS: z.string().default("gpt-5.4,gpt-4.1,gpt-4.1-mini,doubao-seed-2-0-pro-260215,doubao-seed-2-0-mini-260215"),
-  MODEL_MAP_JSON: z.string().default("{\"gpt-5.4\":\"doubao-seed-2-0-mini-260215\",\"gpt-4.1\":\"doubao-seed-2-0-pro-260215\",\"gpt-4.1-mini\":\"doubao-seed-2-0-mini-260215\",\"doubao-seed-2-0-pro-260215\":\"doubao-seed-2-0-pro-260215\",\"doubao-seed-2-0-mini-260215\":\"doubao-seed-2-0-mini-260215\"}"),
+  EXPOSE_MODELS: z.string().default("doubao-seed-2-0-pro-260215,doubao-seed-2-0-mini-260215"),
+  MODEL_MAP_JSON: z.string().default("{\"doubao-seed-2-0-pro-260215\":\"doubao-seed-2-0-pro-260215\",\"doubao-seed-2-0-mini-260215\":\"doubao-seed-2-0-mini-260215\"}"),
   REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(300000),
   STREAM_IDLE_TIMEOUT_MS: z.coerce.number().int().positive().default(60000),
   PROXY_AUTH_TOKEN: z.string().default("")

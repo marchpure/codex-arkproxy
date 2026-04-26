@@ -18,6 +18,14 @@ curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark
 codex-arkproxy --model doubao-seed-2-0-pro-260215
 ```
 
+`gpt-*` 模型会绕过本地代理，直接交给原生 Codex/OpenAI 配置，例如：
+
+```bash
+codex-arkproxy --model gpt-5.5
+```
+
+`doubao-*` 模型才会进入 `codex-ark-proxy`。
+
 如果当前 shell 还找不到 `codex-arkproxy`：
 
 ```bash
@@ -50,7 +58,7 @@ curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark
 - `ARK_REGION`: 透传为 `X-User-Region`。
 - `ARK_ENDPOINT`: 透传为 `X-User-Model`。
 - `ARK_EXTRA_HEADERS_JSON`: 透传额外上游 header，`authorization` 和 `content-type` 会被代理保护性忽略。
-- `EXPOSE_MODELS`: 控制 `/v1/models` 和安装生成的 `model_catalog_json`，用于 Codex 内 `/model` 切换。
+- `EXPOSE_MODELS`: 控制代理 `/v1/models` 和安装生成的 `model_catalog_json`。默认只暴露 `doubao-*`，避免把 `gpt-*` 映射到豆包造成误解。
 
 ## Ark Responses API
 

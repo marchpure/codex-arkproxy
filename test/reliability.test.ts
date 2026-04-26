@@ -150,19 +150,14 @@ for (const testCase of authCases) {
 
 const modelCases = [
   {
-    name: "maps gpt-5.4 to mini",
-    requestedModel: "gpt-5.4",
-    expectedModel: "doubao-seed-2-0-mini-260215"
-  },
-  {
-    name: "maps gpt-4.1 to pro",
-    requestedModel: "gpt-4.1",
-    expectedModel: "doubao-seed-2-0-pro-260215"
-  },
-  {
-    name: "passes through native doubao model",
+    name: "maps native pro to pro",
     requestedModel: "doubao-seed-2-0-pro-260215",
     expectedModel: "doubao-seed-2-0-pro-260215"
+  },
+  {
+    name: "maps native mini to mini",
+    requestedModel: "doubao-seed-2-0-mini-260215",
+    expectedModel: "doubao-seed-2-0-mini-260215"
   },
   {
     name: "uses default model when omitted",
@@ -171,7 +166,7 @@ const modelCases = [
   },
   {
     name: "trims requested model",
-    requestedModel: " gpt-5.4 ",
+    requestedModel: " doubao-seed-2-0-mini-260215 ",
     expectedModel: "doubao-seed-2-0-mini-260215"
   },
   {

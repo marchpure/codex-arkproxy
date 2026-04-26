@@ -15,9 +15,10 @@ const baseConfig = {
   arkEndpoint: "",
   arkExtraHeaders: {},
   arkModelDefault: "doubao-seed-2-0-pro-260215",
-  exposeModels: ["gpt-5.4", "doubao-seed-2-0-pro-260215"],
+  exposeModels: ["doubao-seed-2-0-pro-260215", "doubao-seed-2-0-mini-260215"],
   modelMap: {
-    "gpt-5.4": "doubao-seed-2-0-mini-260215"
+    "doubao-seed-2-0-pro-260215": "doubao-seed-2-0-pro-260215",
+    "doubao-seed-2-0-mini-260215": "doubao-seed-2-0-mini-260215"
   },
   requestTimeoutMs: 1000,
   streamIdleTimeoutMs: 1000,
@@ -38,7 +39,7 @@ test("health and models routes expose proxy metadata", async () => {
     service: "codex-ark-proxy",
     arkBaseUrl: "https://ark.example.com",
     defaultModel: "doubao-seed-2-0-pro-260215",
-    exposeModels: ["gpt-5.4", "doubao-seed-2-0-pro-260215"],
+    exposeModels: ["doubao-seed-2-0-pro-260215", "doubao-seed-2-0-mini-260215"],
     authEnabled: false,
     region: null,
     endpoint: null
@@ -53,13 +54,13 @@ test("health and models routes expose proxy metadata", async () => {
     object: "list",
     data: [
       {
-        id: "gpt-5.4",
+        id: "doubao-seed-2-0-pro-260215",
         object: "model",
         created: 0,
         owned_by: "codex-ark-proxy"
       },
       {
-        id: "doubao-seed-2-0-pro-260215",
+        id: "doubao-seed-2-0-mini-260215",
         object: "model",
         created: 0,
         owned_by: "codex-ark-proxy"

@@ -102,7 +102,7 @@ test("repair-model-cache initializes models_cache.json when missing", () => {
   const parsed = JSON.parse(fs.readFileSync(cachePath, "utf8"));
   const slugs = parsed.models.map((model: { slug: string }) => model.slug);
 
-  assert.ok(slugs.includes("gpt-5.4"));
+  assert.equal(slugs.includes("gpt-5.4"), false);
   assert.ok(slugs.includes("doubao-seed-2-0-pro-260215"));
   assert.ok(slugs.includes("doubao-seed-2-0-mini-260215"));
   const derived = parsed.models.find((model: { slug: string }) => model.slug === "doubao-seed-2-0-pro-260215");
@@ -119,7 +119,7 @@ test("repair-model-cache includes configured exposed models", () => {
       ...process.env,
       HOME: tempHome,
       ARK_MODEL_DEFAULT: "custom-default",
-      EXPOSE_MODELS: "custom-default, custom-extra"
+      EXPOSE_MODELS: "custom-default, custom-extra, gpt-5.5"
     }
   });
 
@@ -129,6 +129,7 @@ test("repair-model-cache includes configured exposed models", () => {
 
   assert.ok(slugs.includes("custom-default"));
   assert.ok(slugs.includes("custom-extra"));
+  assert.equal(slugs.includes("gpt-5.5"), false);
 });
 
 test("bootstrap catalog generator emits Codex-compatible model_messages", () => {
@@ -141,8 +142,16 @@ test("bootstrap catalog generator emits Codex-compatible model_messages", () => 
 
 test("bootstrap launcher pins Codex to arkproxy provider and model", () => {
   const script = fs.readFileSync("bootstrap-codex-ark.sh", "utf8");
-  assert.match(script, /-c 'model_provider="codex"'/);
+  assert.match(script, /-c 'model_provider="codex-arkproxy-local"'/);
   assert.match(script, /-c 'model="\$ARK_MODEL_DEFAULT"'/);
   assert.match(script, /-c 'model_catalog_json="\$CODEX_HOME_DIR\/model-catalogs\/codex-arkproxy-current\.json"'/);
-  assert.match(script, /model_providers\.codex\.base_url="http:\/\/\$PROXY_HOST:\$PROXY_PORT"/);
+  assert.match(script, /model_providers\.codex-arkproxy-local\.base_url="http:\/\/\$PROXY_HOST:\$PROXY_PORT"/);
+});
+
+test("bootstrap launcher routes gpt models to native Codex instead of arkproxy", () => {
+  const script = fs.readFileSync("bootstrap-codex-ark.sh", "utf8");
+  assert.match(script, /requested_model/);
+  assert.match(script, /\[\[ "\\\$requested_model" == gpt-\* \]\]/);
+  assert.match(script, /unset CODEX_HOME/);
+  assert.match(script, /exec "\\\$codex_bin" "\\\$@"/);
 });

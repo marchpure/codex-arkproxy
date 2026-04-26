@@ -20,15 +20,15 @@ test("resolveModel maps configured upstream models and falls back to defaults", 
     arkModelDefault: "default-model",
     exposeModels: ["default-model"],
     modelMap: {
-      "gpt-5.4": "doubao-seed-2-0-mini-260215"
+      "doubao-seed-2-0-mini-260215": "doubao-seed-2-0-mini-260215"
     },
     requestTimeoutMs: 1,
     streamIdleTimeoutMs: 1,
     proxyAuthToken: ""
   };
 
-  assert.deepEqual(resolveModel("gpt-5.4", config), {
-    upstreamModel: "gpt-5.4",
+  assert.deepEqual(resolveModel("doubao-seed-2-0-mini-260215", config), {
+    upstreamModel: "doubao-seed-2-0-mini-260215",
     downstreamModel: "doubao-seed-2-0-mini-260215"
   });
   assert.deepEqual(resolveModel(undefined, config), {
