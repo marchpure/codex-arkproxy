@@ -511,6 +511,72 @@ export function buildStreamingEvents(payloadText: string, downstreamModel: strin
   return frames;
 }
 
+function normalizeChatCompletionsPayload(payloadText: string, downstreamModel: string): Record<string, unknown> {
+  const payload = JSON.parse(payloadText) as unknown;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new SyntaxError("Chat completions payload must be a JSON object");
+  }
+  const record = payload as Record<string, unknown>;
+  const choices = Array.isArray(record.choices) ? record.choices : [];
+  const firstChoice = choices[0];
+  const message = firstChoice && typeof firstChoice === "object"
+    ? (firstChoice as Record<string, unknown>).message
+    : undefined;
+  const assistant = message && typeof message === "object" ? message as Record<string, unknown> : {};
+  const output: Record<string, unknown>[] = [];
+  const content = typeof assistant.content === "string" ? assistant.content : "";
+
+  if (content) {
+    output.push({
+      type: "message",
+      id: `msg_${typeof record.id === "string" ? record.id : makeRequestId()}`,
+      role: "assistant",
+      status: "completed",
+      content: [{ type: "output_text", text: content }]
+    });
+  }
+
+  const toolCalls = Array.isArray(assistant.tool_calls) ? assistant.tool_calls : [];
+  for (const toolCall of toolCalls) {
+    if (!toolCall || typeof toolCall !== "object") {
+      continue;
+    }
+    const toolRecord = toolCall as Record<string, unknown>;
+    const fn = toolRecord.function && typeof toolRecord.function === "object"
+      ? toolRecord.function as Record<string, unknown>
+      : {};
+    output.push({
+      type: "function_call",
+      id: typeof toolRecord.id === "string" ? toolRecord.id : makeRequestId(),
+      call_id: typeof toolRecord.id === "string" ? toolRecord.id : makeRequestId(),
+      name: typeof fn.name === "string" ? fn.name : "unknown_tool",
+      arguments: typeof fn.arguments === "string" ? fn.arguments : "{}",
+      status: "completed"
+    });
+  }
+
+  return {
+    id: typeof record.id === "string" ? record.id : makeRequestId(),
+    object: "response",
+    created_at: typeof record.created === "number" ? record.created : Math.floor(Date.now() / 1000),
+    model: typeof record.model === "string" ? record.model : downstreamModel,
+    status: "completed",
+    output,
+    usage: record.usage
+  };
+}
+
+export function normalizeUpstreamPayload(
+  payloadText: string,
+  downstreamModel: string,
+  mode: ProxyConfig["arkApiMode"]
+): Record<string, unknown> {
+  if (mode === "chat_completions") {
+    return normalizeChatCompletionsPayload(payloadText, downstreamModel);
+  }
+  return normalizeResponseForStreaming(parseStreamingPayload(payloadText), downstreamModel);
+}
+
 function streamNormalizedResponse(reply: FastifyReply, frames: StreamingEventFrame[], idleTimeoutMs: number): void {
   const resetIdleTimer = (() => {
     let timer: NodeJS.Timeout | undefined;
@@ -621,14 +687,22 @@ async function handleResponses(request: FastifyRequest, reply: FastifyReply, con
     reply.header("x-codex-ark-proxy-request-id", requestId);
     reply.header("x-codex-ark-upstream-model", downstreamModel);
 
-    reply.header("content-type", upstreamResponse.contentType);
+    reply.header("content-type", config.arkApiMode === "chat_completions" ? "application/json; charset=utf-8" : upstreamResponse.contentType);
     reply.code(upstreamResponse.status);
 
     if (!stream) {
+      if (config.arkApiMode === "chat_completions") {
+        return reply.send(JSON.stringify(normalizeUpstreamPayload(upstreamResponse.text, downstreamModel, config.arkApiMode)));
+      }
       return reply.send(upstreamResponse.text);
     }
 
-    const frames = buildStreamingEvents(upstreamResponse.text, downstreamModel);
+    const frames = buildStreamingEvents(
+      config.arkApiMode === "chat_completions"
+        ? JSON.stringify(normalizeUpstreamPayload(upstreamResponse.text, downstreamModel, config.arkApiMode))
+        : upstreamResponse.text,
+      downstreamModel
+    );
     streamNormalizedResponse(reply, frames, config.streamIdleTimeoutMs);
     return reply;
   } catch (error) {

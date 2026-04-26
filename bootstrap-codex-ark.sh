@@ -27,15 +27,28 @@ CODEX_NPM_PACKAGE="${CODEX_NPM_PACKAGE:-@openai/codex}"
 PROXY_HOST="${PROXY_HOST:-127.0.0.1}"
 PROXY_PORT="${PROXY_PORT:-8787}"
 LOG_LEVEL="${LOG_LEVEL:-info}"
+ARK_BASE_URL_WAS_SET="${ARK_BASE_URL+x}"
 ARK_BASE_URL="${ARK_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}"
+ARK_API_MODE="${ARK_API_MODE:-responses}"
 ARK_MODEL_DEFAULT="${ARK_MODEL_DEFAULT:-doubao-seed-2-0-pro-260215}"
 ARK_API_KEY="${ARK_API_KEY:-}"
 ARK_REGION="${ARK_REGION:-}"
 ARK_ENDPOINT="${ARK_ENDPOINT:-}"
 ARK_EXTRA_HEADERS_JSON="${ARK_EXTRA_HEADERS_JSON:-{}}"
 EXPOSE_MODELS="${EXPOSE_MODELS:-gpt-5.4,gpt-4.1,gpt-4.1-mini,doubao-seed-2-0-pro-260215,doubao-seed-2-0-mini-260215}"
+CODING_PLAN="${CODING_PLAN:-false}"
 OS_NAME="$(uname -s)"
 CODEX_AVAILABLE=false
+
+if [[ "$CODING_PLAN" == "true" ]]; then
+  if [[ -z "$ARK_BASE_URL_WAS_SET" ]]; then
+    ARK_BASE_URL="https://ark.cn-beijing.volces.com/api/coding/v3"
+  fi
+  ARK_API_MODE="${ARK_API_MODE:-chat_completions}"
+  if [[ "$ARK_API_MODE" == "responses" ]]; then
+    ARK_API_MODE="chat_completions"
+  fi
+fi
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -129,6 +142,7 @@ PROXY_PORT=$PROXY_PORT
 LOG_LEVEL=$LOG_LEVEL
 
 ARK_BASE_URL=$ARK_BASE_URL
+ARK_API_MODE=$ARK_API_MODE
 ARK_API_KEY=$ARK_API_KEY
 ARK_REGION=$ARK_REGION
 ARK_ENDPOINT=$ARK_ENDPOINT
@@ -142,6 +156,7 @@ EOF
   upsert_env_var "$env_file" PROXY_PORT "$PROXY_PORT" always
   upsert_env_var "$env_file" LOG_LEVEL "$LOG_LEVEL" always
   upsert_env_var "$env_file" ARK_BASE_URL "$ARK_BASE_URL" always
+  upsert_env_var "$env_file" ARK_API_MODE "$ARK_API_MODE" always
   upsert_env_var "$env_file" ARK_API_KEY "$ARK_API_KEY" nonempty
   upsert_env_var "$env_file" ARK_REGION "$ARK_REGION" always
   upsert_env_var "$env_file" ARK_ENDPOINT "$ARK_ENDPOINT" always

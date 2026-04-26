@@ -52,6 +52,23 @@ curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark
 - `ARK_EXTRA_HEADERS_JSON`: 透传额外上游 header，`authorization` 和 `content-type` 会被代理保护性忽略。
 - `EXPOSE_MODELS`: 控制 `/v1/models` 和安装生成的 `model_catalog_json`，用于 Codex 内 `/model` 切换。
 
+## 火山引擎 Coding Plan
+
+Coding Plan 使用 OpenAI Chat Completions 兼容入口，不是默认的 Ark Responses 入口。安装时可以显式启用：
+
+```bash
+curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark.sh | \
+  ARK_API_KEY=你的CodingPlanKey \
+  CODING_PLAN=true \
+  ARK_MODEL_DEFAULT=doubao-seed-2-0-pro-260215 \
+  bash
+```
+
+等价手动配置：
+
+- `ARK_BASE_URL=https://ark.cn-beijing.volces.com/api/coding/v3`
+- `ARK_API_MODE=chat_completions`
+
 最小 smoke：
 
 ```bash

@@ -9,6 +9,7 @@ const baseConfig = {
   port: 8787,
   logLevel: "error" as const,
   arkBaseUrl: "https://ark.example.com",
+  arkApiMode: "responses",
   arkApiKey: "ark-key",
   arkRegion: "",
   arkEndpoint: "",

@@ -4,6 +4,7 @@ import {
   buildStreamingEvents,
   buildStreamCompletionResponse,
   extractOutputText,
+  normalizeUpstreamPayload,
   normalizeResponseForStreaming,
   pickAssistantMessage
 } from "../src/routes.ts";
@@ -160,4 +161,74 @@ test("buildStreamingEvents emits native-like reasoning, tool call, and message s
   const messageAdded = frames[messageAddedIndex]?.data.item as Record<string, unknown>;
   assert.equal(messageAdded.type, "message");
   assert.equal(messageAdded.phase, "final_answer");
+});
+
+test("normalizeUpstreamPayload converts chat completions text into responses output", () => {
+  assert.deepEqual(
+    normalizeUpstreamPayload(JSON.stringify({
+      id: "chatcmpl_1",
+      created: 123,
+      model: "doubao-coding-plan",
+      choices: [
+        {
+          message: {
+            role: "assistant",
+            content: "coding plan answer"
+          }
+        }
+      ],
+      usage: { total_tokens: 10 }
+    }), "fallback-model", "chat_completions"),
+    {
+      id: "chatcmpl_1",
+      object: "response",
+      created_at: 123,
+      model: "doubao-coding-plan",
+      status: "completed",
+      output: [
+        {
+          type: "message",
+          id: "msg_chatcmpl_1",
+          role: "assistant",
+          status: "completed",
+          content: [{ type: "output_text", text: "coding plan answer" }]
+        }
+      ],
+      usage: { total_tokens: 10 }
+    }
+  );
+});
+
+test("normalizeUpstreamPayload converts chat completions tool calls into response function calls", () => {
+  const normalized = normalizeUpstreamPayload(JSON.stringify({
+    id: "chatcmpl_2",
+    choices: [
+      {
+        message: {
+          role: "assistant",
+          tool_calls: [
+            {
+              id: "call_1",
+              type: "function",
+              function: {
+                name: "exec_command",
+                arguments: "{\"cmd\":\"pwd\"}"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }), "fallback-model", "chat_completions");
+
+  assert.deepEqual(normalized.output, [
+    {
+      type: "function_call",
+      id: "call_1",
+      call_id: "call_1",
+      name: "exec_command",
+      arguments: "{\"cmd\":\"pwd\"}",
+      status: "completed"
+    }
+  ]);
 });

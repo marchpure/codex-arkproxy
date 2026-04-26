@@ -1,10 +1,12 @@
 export type ModelMap = Record<string, string>;
+export type ArkApiMode = "responses" | "chat_completions";
 
 export type ProxyConfig = {
   host: string;
   port: number;
   logLevel: "debug" | "info" | "warn" | "error";
   arkBaseUrl: string;
+  arkApiMode: ArkApiMode;
   arkApiKey: string;
   arkRegion?: string;
   arkEndpoint?: string;

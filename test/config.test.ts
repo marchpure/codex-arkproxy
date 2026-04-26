@@ -11,6 +11,7 @@ test("loadConfig normalizes base URL and parses exposed models and model map", (
   process.env.PROXY_PORT = "9999";
   process.env.LOG_LEVEL = "debug";
   process.env.ARK_BASE_URL = "https://ark.example.com///";
+  process.env.ARK_API_MODE = "chat_completions";
   process.env.ARK_API_KEY = "test-key";
   process.env.ARK_REGION = "sg";
   process.env.ARK_ENDPOINT = "ep-123";
@@ -28,6 +29,7 @@ test("loadConfig normalizes base URL and parses exposed models and model map", (
       port: 9999,
       logLevel: "debug",
       arkBaseUrl: "https://ark.example.com",
+      arkApiMode: "chat_completions",
       arkApiKey: "test-key",
       arkRegion: "sg",
       arkEndpoint: "ep-123",
