@@ -11,8 +11,11 @@ const context = {
 
 test("deepStripExternalWebAccess removes Ark-incompatible nested fields", () => {
   const input = {
+    summary: "auto",
     text: {
-      verbosity: "low"
+      verbosity: "low",
+      search_content_types: ["webpage"],
+      summary: [{ type: "summary_text", text: "nested" }]
     },
     tools: [
       {
@@ -24,6 +27,8 @@ test("deepStripExternalWebAccess removes Ark-incompatible nested fields", () => 
       external_web_access: true,
       child: {
         verbosity: "low",
+        search_content_types: ["webpage"],
+        summary: [{ type: "summary_text", text: "thinking" }],
         keep: "ok"
       }
     }
@@ -48,7 +53,7 @@ test("sanitizeTools keeps only function tools", () => {
   const input = [
     { type: "function", name: "exec_command" },
     { type: "custom", name: "apply_patch" },
-    { type: "web_search", external_web_access: true },
+    { type: "web_search", external_web_access: true, search_content_types: ["webpage"] },
     "bad-shape"
   ];
 
@@ -67,9 +72,10 @@ test("buildDownstreamBody rewrites stream mode and strips unsupported fields", (
     tools: [
       { type: "function", name: "exec_command" },
       { type: "custom", name: "apply_patch" },
-      { type: "web_search", external_web_access: true }
+      { type: "web_search", external_web_access: true, search_content_types: ["webpage"] }
     ],
     client_metadata: { dropped: true },
+    summary: "auto",
     prompt_cache_key: "abc"
   };
 
@@ -141,7 +147,6 @@ test("buildDownstreamBody backfills missing input status for replayed output ite
       {
         type: "reasoning",
         id: "rs_1",
-        summary: [{ type: "summary_text", text: "thinking" }],
         status: "completed"
       },
       {

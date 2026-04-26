@@ -57,9 +57,11 @@ const stripStressCases = Array.from({ length: 96 }, (_, index) => ({
     verbosity: index % 3 === 0 ? "high" : undefined,
     nested: {
       keepNested: index,
+      summary: [{ type: "summary_text", text: `nested-${index}` }],
       external_web_access: true,
       child: {
         keepChild: `c-${index}`,
+        summary: [{ type: "summary_text", text: `child-${index}` }],
         verbosity: "low"
       }
     },
@@ -78,7 +80,9 @@ for (const testCase of stripStressCases) {
     assert.equal("external_web_access" in stripped, false);
     assert.equal("verbosity" in stripped, false);
     assert.equal((stripped.nested as Record<string, unknown>).keepNested, testCase.index);
+    assert.equal("summary" in (stripped.nested as Record<string, unknown>), false);
     assert.equal("external_web_access" in (stripped.nested as Record<string, unknown>), false);
+    assert.equal("summary" in ((stripped.nested as Record<string, unknown>).child as Record<string, unknown>), false);
     assert.equal("verbosity" in ((stripped.nested as Record<string, unknown>).child as Record<string, unknown>), false);
     assert.equal(Array.isArray(stripped.list), true);
     assert.equal("external_web_access" in (stripped.list as Record<string, unknown>[])[0], false);
@@ -149,6 +153,7 @@ for (const testCase of downstreamBodyCases) {
     assert.equal((body.input as Record<string, unknown>[])[2].status, "completed");
     assert.equal((body.input as Record<string, unknown>[])[3].status, "completed");
     assert.equal("status" in (body.input as Record<string, unknown>[])[4], false);
+    assert.equal("summary" in (body.input as Record<string, unknown>[])[1], false);
     assert.equal((body.tools as unknown[]).length, 1);
     assert.equal("verbosity" in ((body.text as Record<string, unknown>)), false);
     assert.equal("external_web_access" in (((body.tools as Record<string, unknown>[])[0].parameters) as Record<string, unknown>), false);

@@ -38,7 +38,7 @@ export function sanitizeTools(rawTools: unknown): unknown {
       return [];
     }
 
-    const sanitized = deepStripExternalWebAccess(tool);
+    const sanitized = deepStripArkUnsupportedFields(tool);
     if (!sanitized || typeof sanitized !== "object") {
       return [];
     }
@@ -52,9 +52,9 @@ export function sanitizeTools(rawTools: unknown): unknown {
   });
 }
 
-export function deepStripExternalWebAccess(value: unknown): unknown {
+export function deepStripArkUnsupportedFields(value: unknown): unknown {
   if (Array.isArray(value)) {
-    return value.map((item) => deepStripExternalWebAccess(item));
+    return value.map((item) => deepStripArkUnsupportedFields(item));
   }
   if (!value || typeof value !== "object") {
     return value;
@@ -69,10 +69,18 @@ export function deepStripExternalWebAccess(value: unknown): unknown {
     if (key === "verbosity") {
       continue;
     }
-    output[key] = deepStripExternalWebAccess(nested);
+    if (key === "search_content_types") {
+      continue;
+    }
+    if (key === "summary") {
+      continue;
+    }
+    output[key] = deepStripArkUnsupportedFields(nested);
   }
   return output;
 }
+
+export const deepStripExternalWebAccess = deepStripArkUnsupportedFields;
 
 function normalizeInputItemStatus(value: unknown): unknown {
   if (!Array.isArray(value)) {
@@ -124,7 +132,10 @@ export function buildDownstreamBody(body: ResponsesRequest, context: ArkRequestC
       downstreamBody.stream = false;
       continue;
     }
-    const sanitizedValue = deepStripExternalWebAccess(value);
+    if (key === "summary") {
+      continue;
+    }
+    const sanitizedValue = deepStripArkUnsupportedFields(value);
     downstreamBody[key] = key === "input"
       ? normalizeInputItemStatus(sanitizedValue)
       : sanitizedValue;
