@@ -25,7 +25,7 @@ codex      # 原生 Codex，默认 GPT/OpenAI，不经过本代理
 codex-ark  # Doubao/Ark，经本地 codex-ark-proxy
 ```
 
-安装脚本要求机器上已经有 `codex` 命令，并且不会安装、覆盖或配置原生 `codex`。GPT/OpenAI 登录和额度由用户按 Codex 官方方式自行处理；本项目只新增 `codex-ark` 这个 Doubao/Ark 入口。
+安装脚本会优先复用已有 `codex` 命令；如果机器还没有 `codex`，默认只安装 Codex CLI 依赖，但不会做 GPT/OpenAI 登录，也不会写入 OpenAI Key。GPT/OpenAI 登录和额度由用户按 Codex 官方方式自行处理；本项目只新增 `codex-ark` 这个 Doubao/Ark 入口。
 
 如果当前 shell 还找不到 `codex-ark`：
 
@@ -107,7 +107,13 @@ curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/uninstall-codex-ark
 
 - Node.js 20+
 - 可用的 Ark API Key
-- 已安装并可执行的 `codex` CLI
+- 可用的 `npm`
+
+如果不希望脚本自动安装缺失的 Codex CLI：
+
+```bash
+INSTALL_CODEX_CLI=false
+```
 
 ## 开发
 

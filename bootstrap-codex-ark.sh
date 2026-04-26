@@ -23,6 +23,8 @@ RUNNER_PATH="${RUNNER_PATH:-$INSTALL_ROOT/run-proxy.sh}"
 PID_FILE="${PID_FILE:-$INSTALL_ROOT/$SERVICE_NAME.pid}"
 LOG_DIR="${LOG_DIR:-$INSTALL_ROOT/logs}"
 SERVICE_MANAGER="${SERVICE_MANAGER:-}"
+INSTALL_CODEX_CLI="${INSTALL_CODEX_CLI:-true}"
+CODEX_NPM_PACKAGE="${CODEX_NPM_PACKAGE:-@openai/codex}"
 PROXY_HOST="${PROXY_HOST:-127.0.0.1}"
 PROXY_PORT="${PROXY_PORT:-8787}"
 LOG_LEVEL="${LOG_LEVEL:-info}"
@@ -123,10 +125,29 @@ has_cmd() {
   command -v "$1" >/dev/null 2>&1
 }
 
+ensure_codex_cli() {
+  if has_cmd codex; then
+    echo "codex CLI already installed; keeping the existing codex command unchanged"
+    return
+  fi
+
+  if [[ "$INSTALL_CODEX_CLI" != "true" ]]; then
+    echo "codex CLI is not installed. Install codex first, or rerun with INSTALL_CODEX_CLI=true." >&2
+    exit 1
+  fi
+
+  print_step "installing codex CLI"
+  npm install -g "$CODEX_NPM_PACKAGE"
+  require_cmd codex
+}
+
 download_and_extract_fallback_archive() {
   local archive_path
+  local archive_base_path
   local env_backup_path
-  archive_path="$(mktemp /tmp/codex-ark-proxy.XXXXXX.tar.gz)"
+  archive_base_path="$(mktemp /tmp/codex-ark-proxy.XXXXXX)"
+  archive_path="$archive_base_path.tar.gz"
+  rm -f "$archive_base_path"
   env_backup_path=""
 
   if [[ -f "$PROJECT_DIR/.env" ]]; then
@@ -710,7 +731,7 @@ main() {
   require_cmd node
   require_cmd npm
   require_cmd git
-  require_cmd codex
+  ensure_codex_cli
 
   print_step "preparing project files"
   ensure_repo
