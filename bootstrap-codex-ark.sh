@@ -25,6 +25,8 @@ LOG_DIR="${LOG_DIR:-$INSTALL_ROOT/logs}"
 SERVICE_MANAGER="${SERVICE_MANAGER:-}"
 INSTALL_CODEX_CLI="${INSTALL_CODEX_CLI:-true}"
 CODEX_NPM_PACKAGE="${CODEX_NPM_PACKAGE:-@openai/codex}"
+OPENAI_API_KEY="${OPENAI_API_KEY:-}"
+CONFIGURE_OPENAI_AUTH="${CONFIGURE_OPENAI_AUTH:-auto}"
 PROXY_HOST="${PROXY_HOST:-127.0.0.1}"
 PROXY_PORT="${PROXY_PORT:-8787}"
 LOG_LEVEL="${LOG_LEVEL:-info}"
@@ -125,6 +127,47 @@ ensure_codex_cli() {
   if has_cmd codex; then
     CODEX_AVAILABLE=true
   fi
+}
+
+configure_openai_auth() {
+  if [[ "$CONFIGURE_OPENAI_AUTH" == "false" || "$CONFIGURE_OPENAI_AUTH" == "0" ]]; then
+    return
+  fi
+
+  if [[ -z "$OPENAI_API_KEY" ]]; then
+    return
+  fi
+
+  if [[ "$CODEX_AVAILABLE" != "true" ]]; then
+    echo "OPENAI_API_KEY was provided, but codex CLI is not available; skipping native codex auth setup" >&2
+    return
+  fi
+
+  print_step "configuring native codex OpenAI auth"
+  if printf '%s\n' "$OPENAI_API_KEY" | codex login --with-api-key >/dev/null 2>&1; then
+    echo "native codex OpenAI auth configured"
+    return
+  fi
+
+  echo "codex login --with-api-key failed; writing ~/.codex/auth.json directly" >&2
+  OPENAI_API_KEY_VALUE="$OPENAI_API_KEY" node <<'NODE'
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+
+const authDir = path.join(os.homedir(), ".codex");
+const authPath = path.join(authDir, "auth.json");
+fs.mkdirSync(authDir, { recursive: true, mode: 0o700 });
+
+let auth = {};
+try {
+  auth = JSON.parse(fs.readFileSync(authPath, "utf8"));
+} catch {}
+
+auth.OPENAI_API_KEY = process.env.OPENAI_API_KEY_VALUE;
+fs.writeFileSync(authPath, `${JSON.stringify(auth, null, 2)}\n`, { mode: 0o600 });
+fs.chmodSync(authPath, 0o600);
+NODE
 }
 
 download_and_extract_fallback_archive() {
@@ -700,6 +743,7 @@ main() {
   require_cmd npm
   require_cmd git
   ensure_codex_cli
+  configure_openai_auth
 
   print_step "preparing project files"
   ensure_repo

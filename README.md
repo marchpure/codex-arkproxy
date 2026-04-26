@@ -10,6 +10,15 @@
 curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark.sh | ARK_API_KEY=你的方舟Key bash
 ```
 
+如果希望一次性把原生 `codex` 的 GPT/OpenAI 侧也配置好，可以同时传入 OpenAI Key：
+
+```bash
+curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark.sh | \
+  ARK_API_KEY=你的方舟Key \
+  OPENAI_API_KEY=你的OpenAIKey \
+  bash
+```
+
 如果目标机器连不上 GitHub，脚本会自动回退到公共桶里的代码包继续安装。
 
 使用：
@@ -25,7 +34,7 @@ codex      # 原生 Codex，默认 GPT/OpenAI，不经过本代理
 codex-ark  # Doubao/Ark，经本地 codex-ark-proxy
 ```
 
-如果你已经安装过 `codex`，安装脚本会复用现有命令，不覆盖、不改写 `~/.codex`。如果机器还没有 `codex`，脚本默认会安装 `@openai/codex`，但不会要求或写入 OpenAI API Key；GPT/OpenAI 侧仍由 `codex` 原生命令自己管理。
+如果你已经安装过 `codex`，安装脚本会复用现有命令，不覆盖命令本身。如果机器还没有 `codex`，脚本默认会安装 `@openai/codex`。`OPENAI_API_KEY` 是可选的：提供时脚本会执行 `codex login --with-api-key` 初始化原生 `codex`；不提供时只保证 `codex-ark` 可用。
 
 如果当前 shell 还找不到 `codex-ark`：
 
@@ -60,6 +69,8 @@ curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark
 - `ARK_ENDPOINT`: 透传为 `X-User-Model`。
 - `ARK_EXTRA_HEADERS_JSON`: 透传额外上游 header，`authorization` 和 `content-type` 会被代理保护性忽略。
 - `EXPOSE_MODELS`: 控制代理 `/v1/models` 和安装生成的 `model_catalog_json`。默认只暴露 `doubao-*`，避免把 `gpt-*` 映射到豆包造成误解。
+- `OPENAI_API_KEY`: 可选。提供后用于初始化原生 `codex` 的 GPT/OpenAI 登录，不会写入 arkproxy 的 `.env`。
+- `CONFIGURE_OPENAI_AUTH=false`: 即使提供了 `OPENAI_API_KEY` 也跳过原生 `codex` 登录配置。
 
 ## Ark Responses API
 
@@ -90,7 +101,8 @@ curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/uninstall-codex-ark
 
 - 拉取或更新仓库到本地安装目录
 - 安装依赖并构建代理
-- 生成独立的 `~/.codex-arkproxy`，不修改 `~/.codex`
+- 生成独立的 `~/.codex-arkproxy`
+- 如果提供 `OPENAI_API_KEY`，初始化原生 `codex` 的 `~/.codex/auth.json`
 - 写入 `config.toml` 和 `.env`
 - 修复 Doubao 模型缓存
 - 安装 `codex-ark` 启动命令
