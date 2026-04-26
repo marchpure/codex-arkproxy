@@ -30,6 +30,10 @@ LOG_LEVEL="${LOG_LEVEL:-info}"
 ARK_BASE_URL="${ARK_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}"
 ARK_MODEL_DEFAULT="${ARK_MODEL_DEFAULT:-doubao-seed-2-0-pro-260215}"
 ARK_API_KEY="${ARK_API_KEY:-}"
+ARK_REGION="${ARK_REGION:-}"
+ARK_ENDPOINT="${ARK_ENDPOINT:-}"
+ARK_EXTRA_HEADERS_JSON="${ARK_EXTRA_HEADERS_JSON:-{}}"
+EXPOSE_MODELS="${EXPOSE_MODELS:-gpt-5.4,gpt-4.1,gpt-4.1-mini,doubao-seed-2-0-pro-260215,doubao-seed-2-0-mini-260215}"
 OS_NAME="$(uname -s)"
 CODEX_AVAILABLE=false
 
@@ -126,21 +130,47 @@ LOG_LEVEL=$LOG_LEVEL
 
 ARK_BASE_URL=$ARK_BASE_URL
 ARK_API_KEY=$ARK_API_KEY
+ARK_REGION=$ARK_REGION
+ARK_ENDPOINT=$ARK_ENDPOINT
+ARK_EXTRA_HEADERS_JSON=$ARK_EXTRA_HEADERS_JSON
 ARK_MODEL_DEFAULT=$ARK_MODEL_DEFAULT
+EXPOSE_MODELS=$EXPOSE_MODELS
 EOF
   fi
 
-  if ! grep -q '^ARK_API_KEY=' "$env_file"; then
-    printf '\nARK_API_KEY=%s\n' "$ARK_API_KEY" >>"$env_file"
-  elif [[ -n "$ARK_API_KEY" ]]; then
-    perl -0pi -e 's/^ARK_API_KEY=.*/ARK_API_KEY='"$ARK_API_KEY"'/m' "$env_file"
-  fi
+  upsert_env_var "$env_file" PROXY_HOST "$PROXY_HOST" always
+  upsert_env_var "$env_file" PROXY_PORT "$PROXY_PORT" always
+  upsert_env_var "$env_file" LOG_LEVEL "$LOG_LEVEL" always
+  upsert_env_var "$env_file" ARK_BASE_URL "$ARK_BASE_URL" always
+  upsert_env_var "$env_file" ARK_API_KEY "$ARK_API_KEY" nonempty
+  upsert_env_var "$env_file" ARK_REGION "$ARK_REGION" always
+  upsert_env_var "$env_file" ARK_ENDPOINT "$ARK_ENDPOINT" always
+  upsert_env_var "$env_file" ARK_EXTRA_HEADERS_JSON "$ARK_EXTRA_HEADERS_JSON" always
+  upsert_env_var "$env_file" ARK_MODEL_DEFAULT "$ARK_MODEL_DEFAULT" always
+  upsert_env_var "$env_file" EXPOSE_MODELS "$EXPOSE_MODELS" always
 
   local ark_api_key
   ark_api_key="$(grep '^ARK_API_KEY=' "$env_file" | tail -n 1 | cut -d= -f2-)"
   if [[ -z "$ark_api_key" ]]; then
     echo "please provide ARK_API_KEY, for example: ARK_API_KEY=xxx bash bootstrap-codex-ark.sh" >&2
     exit 1
+  fi
+}
+
+upsert_env_var() {
+  local env_file="$1"
+  local key="$2"
+  local value="$3"
+  local mode="${4:-always}"
+
+  if [[ "$mode" == "nonempty" && -z "$value" && -n "$(grep "^$key=" "$env_file" 2>/dev/null | tail -n 1 | cut -d= -f2-)" ]]; then
+    return
+  fi
+
+  if grep -q "^$key=" "$env_file"; then
+    ENV_KEY="$key" ENV_VALUE="$value" perl -0pi -e 's/^\Q$ENV{ENV_KEY}\E=.*/$ENV{ENV_KEY}=$ENV{ENV_VALUE}/m' "$env_file"
+  else
+    printf '\n%s=%s\n' "$key" "$value" >>"$env_file"
   fi
 }
 
@@ -151,9 +181,14 @@ setup_codex_home() {
     cp "$HOME/.codex/auth.json" "$CODEX_HOME_DIR/auth.json"
   fi
 
+  local model_catalog_path
+  model_catalog_path="$CODEX_HOME_DIR/model-catalogs/codex-arkproxy-current.json"
+  mkdir -p "$(dirname "$model_catalog_path")"
+
   cat >"$CODEX_HOME_DIR/config.toml" <<EOF
 model_provider = "codex"
 model = "$ARK_MODEL_DEFAULT"
+model_catalog_json = "$model_catalog_path"
 model_reasoning_effort = "medium"
 model_reasoning_summary = "auto"
 approval_policy = "never"
@@ -165,6 +200,51 @@ name = "codex"
 base_url = "http://$PROXY_HOST:$PROXY_PORT"
 wire_api = "responses"
 EOF
+
+  node - "$model_catalog_path" "$EXPOSE_MODELS" "$ARK_MODEL_DEFAULT" <<'NODE'
+const fs = require("node:fs");
+const [catalogPath, exposeModels, defaultModel] = process.argv.slice(2);
+const modelIds = exposeModels.split(",").map((item) => item.trim()).filter(Boolean);
+if (!modelIds.includes(defaultModel)) {
+  modelIds.unshift(defaultModel);
+}
+const models = [...new Set(modelIds)].map((id, index) => ({
+  slug: id,
+  display_name: id,
+  description: `${id} via codex-ark-proxy.`,
+  default_reasoning_level: "medium",
+  supported_reasoning_levels: [
+    { effort: "low", description: "Fast responses with lighter reasoning." },
+    { effort: "medium", description: "Balanced speed and reasoning depth." },
+    { effort: "high", description: "Greater reasoning depth for complex tasks." },
+    { effort: "xhigh", description: "Extra high reasoning depth for complex tasks." }
+  ],
+  supports_reasoning_summaries: true,
+  default_reasoning_summary: "auto",
+  support_verbosity: true,
+  default_verbosity: "low",
+  shell_type: "shell_command",
+  visibility: "list",
+  supported_in_api: true,
+  priority: id === defaultModel ? 100 : 50 + index,
+  additional_speed_tiers: [],
+  availability_nux: null,
+  upgrade: null,
+  model_messages: [],
+  apply_patch_tool_type: "freeform",
+  web_search_tool_type: "text_and_image",
+  truncation_policy: { mode: "tokens", limit: 10000 },
+  supports_parallel_tool_calls: true,
+  supports_image_detail_original: true,
+  experimental_supported_tools: [],
+  input_modalities: ["text", "image"],
+  supports_search_tool: true,
+  context_window: 131072,
+  effective_context_window_percent: 95,
+  base_instructions: "You are a coding agent running in Codex CLI via codex-ark-proxy."
+}));
+fs.writeFileSync(catalogPath, `${JSON.stringify({ models }, null, 2)}\n`, "utf8");
+NODE
 }
 
 ensure_shell_rc() {

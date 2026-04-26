@@ -10,6 +10,9 @@ const baseConfig = {
   logLevel: "error" as const,
   arkBaseUrl: "https://ark.example.com",
   arkApiKey: "ark-key",
+  arkRegion: "",
+  arkEndpoint: "",
+  arkExtraHeaders: {},
   arkModelDefault: "doubao-seed-2-0-pro-260215",
   exposeModels: ["gpt-5.4", "gpt-4.1", "doubao-seed-2-0-pro-260215"],
   modelMap: {

@@ -133,10 +133,22 @@ export function buildDownstreamBody(body: ResponsesRequest, context: ArkRequestC
   return downstreamBody;
 }
 
-function buildArkHeaders(config: ProxyConfig): Headers {
+export function buildArkHeaders(config: ProxyConfig): Headers {
   const headers = new Headers();
   headers.set("content-type", "application/json");
   headers.set("authorization", `Bearer ${config.arkApiKey}`);
+  if (config.arkRegion) {
+    headers.set("x-user-region", config.arkRegion);
+  }
+  if (config.arkEndpoint) {
+    headers.set("x-user-model", config.arkEndpoint);
+  }
+  for (const [key, value] of Object.entries(config.arkExtraHeaders ?? {})) {
+    if (key.toLowerCase() === "authorization" || key.toLowerCase() === "content-type") {
+      continue;
+    }
+    headers.set(key, value);
+  }
   return headers;
 }
 

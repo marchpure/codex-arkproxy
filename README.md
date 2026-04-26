@@ -33,6 +33,25 @@ curl http://127.0.0.1:8787/healthz
 curl http://127.0.0.1:8787/v1/models
 ```
 
+## Ark 扩展配置
+
+安装脚本支持把 region、endpoint 和额外 header 写入代理环境，便于对接非默认区域或 endpoint 型方舟资源：
+
+```bash
+curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark.sh | \
+  ARK_API_KEY=你的方舟Key \
+  ARK_REGION=sg \
+  ARK_ENDPOINT=ep-xxxxxxxx \
+  bash
+```
+
+可选变量：
+
+- `ARK_REGION`: 透传为 `X-User-Region`。
+- `ARK_ENDPOINT`: 透传为 `X-User-Model`。
+- `ARK_EXTRA_HEADERS_JSON`: 透传额外上游 header，`authorization` 和 `content-type` 会被代理保护性忽略。
+- `EXPOSE_MODELS`: 控制 `/v1/models` 和安装生成的 `model_catalog_json`，用于 Codex 内 `/model` 切换。
+
 最小 smoke：
 
 ```bash

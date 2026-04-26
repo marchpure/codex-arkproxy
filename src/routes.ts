@@ -689,7 +689,9 @@ export async function registerRoutes(app: FastifyInstance, config: ProxyConfig):
     arkBaseUrl: config.arkBaseUrl,
     defaultModel: config.arkModelDefault,
     exposeModels: config.exposeModels,
-    authEnabled: Boolean(config.proxyAuthToken)
+    authEnabled: Boolean(config.proxyAuthToken),
+    region: config.arkRegion || null,
+    endpoint: config.arkEndpoint || null
   }));
 
   app.get("/v1/models", async (_request, reply) => {

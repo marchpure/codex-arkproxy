@@ -10,6 +10,9 @@ const baseConfig = {
   logLevel: "info" as const,
   arkBaseUrl: "https://ark.example.com",
   arkApiKey: "ark-key",
+  arkRegion: "",
+  arkEndpoint: "",
+  arkExtraHeaders: {},
   arkModelDefault: "doubao-seed-2-0-pro-260215",
   exposeModels: ["gpt-5.4", "doubao-seed-2-0-pro-260215"],
   modelMap: {
@@ -35,7 +38,9 @@ test("health and models routes expose proxy metadata", async () => {
     arkBaseUrl: "https://ark.example.com",
     defaultModel: "doubao-seed-2-0-pro-260215",
     exposeModels: ["gpt-5.4", "doubao-seed-2-0-pro-260215"],
-    authEnabled: false
+    authEnabled: false,
+    region: null,
+    endpoint: null
   });
 
   const models = await app.inject({

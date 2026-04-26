@@ -12,6 +12,9 @@ test("loadConfig normalizes base URL and parses exposed models and model map", (
   process.env.LOG_LEVEL = "debug";
   process.env.ARK_BASE_URL = "https://ark.example.com///";
   process.env.ARK_API_KEY = "test-key";
+  process.env.ARK_REGION = "sg";
+  process.env.ARK_ENDPOINT = "ep-123";
+  process.env.ARK_EXTRA_HEADERS_JSON = "{\"x-custom\":\"custom-value\"}";
   process.env.ARK_MODEL_DEFAULT = "doubao-default";
   process.env.EXPOSE_MODELS = "a, b , ,c";
   process.env.MODEL_MAP_JSON = "{\"a\":\"aa\",\"b\":\"bb\"}";
@@ -26,6 +29,11 @@ test("loadConfig normalizes base URL and parses exposed models and model map", (
       logLevel: "debug",
       arkBaseUrl: "https://ark.example.com",
       arkApiKey: "test-key",
+      arkRegion: "sg",
+      arkEndpoint: "ep-123",
+      arkExtraHeaders: {
+        "x-custom": "custom-value"
+      },
       arkModelDefault: "doubao-default",
       exposeModels: ["a", "b", "c"],
       modelMap: {

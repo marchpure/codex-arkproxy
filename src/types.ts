@@ -6,6 +6,9 @@ export type ProxyConfig = {
   logLevel: "debug" | "info" | "warn" | "error";
   arkBaseUrl: string;
   arkApiKey: string;
+  arkRegion?: string;
+  arkEndpoint?: string;
+  arkExtraHeaders?: Record<string, string>;
   arkModelDefault: string;
   exposeModels: string[];
   modelMap: ModelMap;
@@ -21,6 +24,8 @@ export type HealthResponse = {
   defaultModel: string;
   exposeModels: string[];
   authEnabled: boolean;
+  region?: string | null;
+  endpoint?: string | null;
 };
 
 export type ResponsesRequest = {

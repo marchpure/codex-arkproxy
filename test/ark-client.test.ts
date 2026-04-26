@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildDownstreamBody, deepStripExternalWebAccess, sanitizeTools } from "../src/ark-client.ts";
+import { buildArkHeaders, buildDownstreamBody, deepStripExternalWebAccess, sanitizeTools } from "../src/ark-client.ts";
 
 const context = {
   requestId: "req_test",
@@ -161,4 +161,33 @@ test("buildDownstreamBody backfills missing input status for replayed output ite
       }
     ]
   });
+});
+
+test("buildArkHeaders forwards region endpoint and safe extra headers", () => {
+  const headers = buildArkHeaders({
+    host: "127.0.0.1",
+    port: 8787,
+    logLevel: "info",
+    arkBaseUrl: "https://ark.example.com",
+    arkApiKey: "ark-key",
+    arkRegion: "sg",
+    arkEndpoint: "ep-123",
+    arkExtraHeaders: {
+      "x-extra": "extra",
+      authorization: "Bearer ignored",
+      "content-type": "text/plain"
+    },
+    arkModelDefault: "default-model",
+    exposeModels: [],
+    modelMap: {},
+    requestTimeoutMs: 1,
+    streamIdleTimeoutMs: 1,
+    proxyAuthToken: ""
+  });
+
+  assert.equal(headers.get("authorization"), "Bearer ark-key");
+  assert.equal(headers.get("content-type"), "application/json");
+  assert.equal(headers.get("x-user-region"), "sg");
+  assert.equal(headers.get("x-user-model"), "ep-123");
+  assert.equal(headers.get("x-extra"), "extra");
 });
