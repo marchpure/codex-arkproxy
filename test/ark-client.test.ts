@@ -200,6 +200,7 @@ test("buildChatCompletionsBody converts responses input and tools for Coding Pla
     input: [
       { type: "message", role: "developer", content: "developer guidance" },
       { type: "message", role: "user", content: [{ type: "input_text", text: "hi" }] },
+      { type: "function_call", id: "fc_1", call_id: "call_1", name: "exec_command", arguments: "{\"cmd\":\"pwd\"}" },
       { type: "function_call_output", call_id: "call_1", output: "ok" }
     ],
     tools: [
@@ -220,6 +221,20 @@ test("buildChatCompletionsBody converts responses input and tools for Coding Pla
       { role: "system", content: "Be concise." },
       { role: "system", content: "developer guidance" },
       { role: "user", content: "hi" },
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [
+          {
+            id: "call_1",
+            type: "function",
+            function: {
+              name: "exec_command",
+              arguments: "{\"cmd\":\"pwd\"}"
+            }
+          }
+        ]
+      },
       { role: "tool", tool_call_id: "call_1", content: "ok" }
     ],
     tools: [

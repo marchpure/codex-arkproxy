@@ -222,6 +222,13 @@ for (let index = 0; index < SCENARIO_COUNT; index += 1) {
     const roles = (latest.body.messages as Record<string, unknown>[]).map((message) => message.role);
     assert.equal(roles.includes("developer"), false);
     assert.equal(roles.every((role) => ["system", "assistant", "user", "tool"].includes(String(role))), true);
+    if (index % 8 === 0 && index % 5 !== 0) {
+      const replay = (latest.body.messages as Record<string, unknown>[]).find((message) => message.role === "assistant" && Array.isArray(message.tool_calls));
+      assert.ok(replay);
+      const toolCalls = replay.tool_calls as Record<string, unknown>[];
+      assert.equal(toolCalls[0]?.id, `call_${index}`);
+      assert.equal((toolCalls[0]?.function as Record<string, unknown> | undefined)?.name, "ignored_replay_call");
+    }
 
     if (toolsForScenario(index)) {
       const tools = latest.body.tools as Record<string, unknown>[];

@@ -194,6 +194,33 @@ function responseInputToChatMessages(body: ResponsesRequest): Array<Record<strin
       });
       continue;
     }
+    if (record.type === "function_call") {
+      const callId = typeof record.call_id === "string"
+        ? record.call_id
+        : typeof record.id === "string"
+          ? record.id
+          : undefined;
+      const name = typeof record.name === "string" ? record.name : "unknown_tool";
+      const argumentsText = typeof record.arguments === "string"
+        ? record.arguments
+        : JSON.stringify(record.arguments ?? {});
+
+      messages.push({
+        role: "assistant",
+        content: "",
+        tool_calls: [
+          {
+            id: callId,
+            type: "function",
+            function: {
+              name,
+              arguments: argumentsText
+            }
+          }
+        ]
+      });
+      continue;
+    }
     if (record.type === "function_call_output") {
       messages.push({
         role: "tool",
