@@ -10,6 +10,7 @@ INSTALL_ROOT="${INSTALL_ROOT:-$HOME/.codex-arkproxy}"
 PROJECT_DIR="${PROJECT_DIR:-$INSTALL_ROOT/codex-ark-proxy}"
 CODEX_HOME_DIR="${CODEX_HOME_DIR:-$HOME/.codex-arkproxy}"
 BIN_DIR="${BIN_DIR:-}"
+ARK_LAUNCHER_NAME="${ARK_LAUNCHER_NAME:-codex-ark}"
 LAUNCH_AGENT_LABEL="${LAUNCH_AGENT_LABEL:-com.marchpure.codex-arkproxy}"
 LAUNCH_AGENT_DIR="${LAUNCH_AGENT_DIR:-$HOME/Library/LaunchAgents}"
 LAUNCH_AGENT_PATH="${LAUNCH_AGENT_PATH:-$LAUNCH_AGENT_DIR/$LAUNCH_AGENT_LABEL.plist}"
@@ -110,6 +111,7 @@ has_cmd() {
 ensure_codex_cli() {
   if has_cmd codex; then
     CODEX_AVAILABLE=true
+    echo "codex CLI already installed; keeping the existing codex command unchanged"
     return
   fi
 
@@ -217,7 +219,7 @@ EOF
   local ark_api_key
   ark_api_key="$(grep '^ARK_API_KEY=' "$env_file" | tail -n 1 | cut -d= -f2-)"
   if [[ -z "$ark_api_key" ]]; then
-    echo "please provide ARK_API_KEY, for example: ARK_API_KEY=xxx bash bootstrap-codex-ark.sh" >&2
+    echo "please provide ARK_API_KEY for doubao, for example: ARK_API_KEY=xxx bash bootstrap-codex-ark.sh" >&2
     exit 1
   fi
 }
@@ -366,7 +368,7 @@ install_launcher() {
   local shell_rc
 
   BIN_DIR="$(choose_bin_dir)"
-  launcher_path="$BIN_DIR/codex-arkproxy"
+  launcher_path="$BIN_DIR/$ARK_LAUNCHER_NAME"
   mkdir -p "$BIN_DIR"
   shell_rc="$(ensure_shell_rc)"
   touch "$shell_rc"
@@ -410,13 +412,13 @@ done
 
 codex_bin="\$(resolve_real_codex || true)"
 if [[ -z "\$codex_bin" ]]; then
-  echo "codex CLI is not installed. Install codex first, then rerun: codex-arkproxy --model $ARK_MODEL_DEFAULT" >&2
+  echo "codex CLI is not installed. Install codex first, then rerun: $ARK_LAUNCHER_NAME" >&2
   exit 1
 fi
 
 if [[ "\$requested_model" == gpt-* ]]; then
-  unset CODEX_HOME
-  exec "\$codex_bin" "\$@"
+  echo "$ARK_LAUNCHER_NAME is for doubao models only. Use codex --model \$requested_model for GPT/OpenAI." >&2
+  exit 2
 fi
 
 export CODEX_HOME="$CODEX_HOME_DIR"
@@ -431,6 +433,11 @@ exec "\$codex_bin" \
   "\$@"
 EOF
   chmod +x "$launcher_path"
+
+  # Remove the old launcher name from earlier versions so codex-ark is the single user-facing entrypoint.
+  if [[ "$ARK_LAUNCHER_NAME" != "codex-arkproxy" ]]; then
+    rm -f "$BIN_DIR/codex-arkproxy"
+  fi
 
   if [[ "$BIN_DIR" == "$HOME/.local/bin" ]]; then
     if ! grep -Fq 'export PATH="$HOME/.local/bin:$PATH"' "$shell_rc"; then
@@ -630,7 +637,7 @@ stop_existing_proxy_processes() {
 }
 
 print_usage_summary() {
-  local next_step="codex-arkproxy --model $ARK_MODEL_DEFAULT"
+  local next_step="$ARK_LAUNCHER_NAME"
 
   cat <<EOF
 
@@ -649,12 +656,13 @@ codex home:
   $CODEX_HOME_DIR
 
 launcher:
-  $BIN_DIR/codex-arkproxy
+  $BIN_DIR/$ARK_LAUNCHER_NAME
 
 service manager:
   $SERVICE_MANAGER
 
 next steps:
+  codex        # existing GPT/OpenAI Codex, unchanged
   $next_step
 
 proxy checks:
@@ -667,7 +675,7 @@ EOF
 
 codex CLI was not found during install.
 install codex first, then run:
-  codex-arkproxy --model $ARK_MODEL_DEFAULT
+  $ARK_LAUNCHER_NAME
 EOF
   fi
 
@@ -716,7 +724,7 @@ main() {
   print_step "repairing Codex model cache"
   npm --prefix "$PROJECT_DIR" run repair-model-cache
 
-  print_step "installing codex launcher"
+  print_step "installing codex-ark launcher"
   install_launcher
 
   print_step "installing proxy runner"

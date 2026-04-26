@@ -1,6 +1,6 @@
 # codex-ark-proxy
 
-让本机 `codex` 直接通过 Ark / Doubao 跑 OpenAI Responses 的本地代理。
+安装一个独立的 `codex-ark` 入口，让 Doubao 通过 Ark Responses API 跑 Codex CLI；原有 `codex` 入口继续走默认 GPT/OpenAI 配置。
 
 ## 快速开始
 
@@ -15,18 +15,19 @@ curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/bootstrap-codex-ark
 使用：
 
 ```bash
-codex-arkproxy --model doubao-seed-2-0-pro-260215
+codex-ark
 ```
 
-`gpt-*` 模型会绕过本地代理，直接交给原生 Codex/OpenAI 配置，例如：
+安装后两个命令的职责固定：
 
 ```bash
-codex-arkproxy --model gpt-5.5
+codex      # 原生 Codex，默认 GPT/OpenAI，不经过本代理
+codex-ark  # Doubao/Ark，经本地 codex-ark-proxy
 ```
 
-`doubao-*` 模型才会进入 `codex-ark-proxy`。
+如果你已经安装过 `codex`，安装脚本会复用现有命令，不覆盖、不改写 `~/.codex`。如果机器还没有 `codex`，脚本默认会安装 `@openai/codex`，但不会要求或写入 OpenAI API Key；GPT/OpenAI 侧仍由 `codex` 原生命令自己管理。
 
-如果当前 shell 还找不到 `codex-arkproxy`：
+如果当前 shell 还找不到 `codex-ark`：
 
 ```bash
 exec "$SHELL" -l
@@ -76,7 +77,7 @@ AUTO_DETECT_ARK_API_MODE=false
 最小 smoke：
 
 ```bash
-codex-arkproxy exec -C /Users/bytedance/Code/arkclaw-hermes --model doubao-seed-2-0-pro-260215 "Reply with exactly: smoke-ok"
+codex-ark exec -C /Users/bytedance/Code/arkclaw-hermes "Reply with exactly: smoke-ok"
 ```
 
 ## 卸载
@@ -89,10 +90,10 @@ curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/uninstall-codex-ark
 
 - 拉取或更新仓库到本地安装目录
 - 安装依赖并构建代理
-- 生成独立的 `~/.codex-arkproxy`
+- 生成独立的 `~/.codex-arkproxy`，不修改 `~/.codex`
 - 写入 `config.toml` 和 `.env`
 - 修复 Doubao 模型缓存
-- 安装 `codex-arkproxy` 启动命令
+- 安装 `codex-ark` 启动命令
 - 注册并启动后台代理服务
 
 后台服务策略：
@@ -107,7 +108,7 @@ curl -fsSL https://haoxingjun-test.tos-cn-beijing.volces.com/uninstall-codex-ark
 - Node.js 20+
 - 可用的 Ark API Key
 
-脚本默认会自动安装 `codex` CLI；如果你不想自动安装，可以在执行时加：
+脚本会优先复用已有 `codex` CLI；只有机器没有 `codex` 时才默认自动安装。如果你不想自动安装，可以在执行时加：
 
 ```bash
 INSTALL_CODEX_CLI=false

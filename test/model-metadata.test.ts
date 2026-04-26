@@ -140,18 +140,20 @@ test("bootstrap catalog generator emits Codex-compatible model_messages", () => 
   assert.doesNotMatch(script, /model_messages: \[\]/);
 });
 
-test("bootstrap launcher pins Codex to arkproxy provider and model", () => {
+test("bootstrap launcher installs codex-ark and pins it to arkproxy provider", () => {
   const script = fs.readFileSync("bootstrap-codex-ark.sh", "utf8");
+  assert.match(script, /ARK_LAUNCHER_NAME="\$\{ARK_LAUNCHER_NAME:-codex-ark\}"/);
+  assert.match(script, /launcher_path="\$BIN_DIR\/\$ARK_LAUNCHER_NAME"/);
   assert.match(script, /-c 'model_provider="codex-arkproxy-local"'/);
   assert.match(script, /-c 'model="\$ARK_MODEL_DEFAULT"'/);
   assert.match(script, /-c 'model_catalog_json="\$CODEX_HOME_DIR\/model-catalogs\/codex-arkproxy-current\.json"'/);
   assert.match(script, /model_providers\.codex-arkproxy-local\.base_url="http:\/\/\$PROXY_HOST:\$PROXY_PORT"/);
 });
 
-test("bootstrap launcher routes gpt models to native Codex instead of arkproxy", () => {
+test("bootstrap launcher rejects gpt models because codex-ark is doubao-only", () => {
   const script = fs.readFileSync("bootstrap-codex-ark.sh", "utf8");
   assert.match(script, /requested_model/);
   assert.match(script, /\[\[ "\\\$requested_model" == gpt-\* \]\]/);
-  assert.match(script, /unset CODEX_HOME/);
-  assert.match(script, /exec "\\\$codex_bin" "\\\$@"/);
+  assert.match(script, /Use codex --model \\\$requested_model for GPT\/OpenAI/);
+  assert.doesNotMatch(script, /unset CODEX_HOME/);
 });

@@ -6,6 +6,7 @@ INSTALL_ROOT="${INSTALL_ROOT:-$HOME/.codex-arkproxy}"
 PROJECT_DIR="${PROJECT_DIR:-$INSTALL_ROOT/codex-ark-proxy}"
 CODEX_HOME_DIR="${CODEX_HOME_DIR:-$HOME/.codex-arkproxy}"
 BIN_DIR="${BIN_DIR:-}"
+ARK_LAUNCHER_NAME="${ARK_LAUNCHER_NAME:-codex-ark}"
 LAUNCH_AGENT_LABEL="${LAUNCH_AGENT_LABEL:-com.marchpure.codex-arkproxy}"
 LAUNCH_AGENT_DIR="${LAUNCH_AGENT_DIR:-$HOME/Library/LaunchAgents}"
 LAUNCH_AGENT_PATH="${LAUNCH_AGENT_PATH:-$LAUNCH_AGENT_DIR/$LAUNCH_AGENT_LABEL.plist}"
@@ -37,7 +38,7 @@ choose_bin_dir() {
   fi
 
   for candidate in /usr/local/bin /opt/homebrew/bin "$HOME/.local/bin"; do
-    if [[ -e "$candidate/codex-arkproxy" || -w "$candidate" ]]; then
+    if [[ -e "$candidate/$ARK_LAUNCHER_NAME" || -e "$candidate/codex-arkproxy" || -w "$candidate" ]]; then
       printf '%s\n' "$candidate"
       return
     fi
@@ -102,7 +103,7 @@ remove_launcher() {
 
   while IFS= read -r resolved_bin; do
     [[ -z "$resolved_bin" ]] && continue
-    rm -f "$resolved_bin/codex-arkproxy"
+    rm -f "$resolved_bin/$ARK_LAUNCHER_NAME" "$resolved_bin/codex-arkproxy"
   done < <(iterate_bin_dirs)
 }
 
